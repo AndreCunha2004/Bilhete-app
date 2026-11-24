@@ -1,0 +1,48 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bilhete · chaves das notificações</title>
+<style>body{font-family:system-ui,sans-serif;background:#F5F0E6;color:#262C45;max-width:720px;margin:0 auto;padding:24px;line-height:1.45}h1{color:#475480}button{font:inherit;font-weight:700;padding:12px 18px;border:0;border-radius:12px;background:#7F3B25;color:#fff;cursor:pointer}
+.k{background:#FFFCF6;border:1px solid #E2D9C6;border-radius:12px;padding:12px;margin:8px 0 16px}.k b{display:block;margin-bottom:6px}code,textarea{font:13px ui-monospace,monospace;word-break:break-all}textarea{width:100%;min-height:90px;border:1px solid #E2D9C6;border-radius:8px;padding:8px;box-sizing:border-box}.c{background:#475480;margin-top:6px;padding:6px 12px;font-size:13px}.warn{color:#7F3B25;font-weight:600}</style></head><body>
+<h1>Chaves das notificações</h1>
+<p>Esta página cria as chaves <b>no seu navegador</b>. Nada é enviado para lugar nenhum. Gere uma vez só e guarde.</p>
+<button id="g">Gerar chaves</button><div id="out"></div>
+<script>
+const b64u=b=>btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const box=(t,v,note,big)=>`<div class="k"><b>${t}</b>${note?`<div>${note}</div>`:''}${big?`<textarea readonly>${v}</textarea>`:`<code>${v}</code>`}<br><button class="c" onclick="navigator.clipboard.writeText(this.dataset.v);this.textContent='Copiado!'" data-v="${v.replace(/"/g,'&quot;')}">Copiar</button></div>`;
+document.getElementById('g').onclick=async()=>{
+ const kp=await crypto.subtle.generateKey({name:'ECDSA',namedCurve:'P-256'},true,['sign','verify']);
+ const pub=b64u(await crypto.subtle.exportKey('raw',kp.publicKey)),priv=(await crypto.subtle.exportKey('jwk',kp.privateKey)).d;
+ const tok=b64u(crypto.getRandomValues(new Uint8Array(24)));
+ const url='https://iulvegutcmzrazaihjdy.supabase.co/functions/v1/notificar';
+ const sql=`create extension if not exists pg_net;
+create extension if not exists pg_cron;
+
+create or replace function public.notificar_atividade() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare agora numeric := extract(epoch from now()) * 1000;
+begin
+  if new.col = 'atividades'
+     and coalesce((new.data->>'at')::numeric, 0) between agora - 600000 and agora + 60000 then
+    perform net.http_post(
+      url := '${url}',
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-bilhete-token', '${tok}'),
+      body := jsonb_build_object('path', new.path));
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists docs_notificar on public.docs;
+create trigger docs_notificar after insert on public.docs
+for each row execute function public.notificar_atividade();
+
+select cron.unschedule(jobid) from cron.job where jobname = 'bilhete-agendados';
+select cron.schedule('bilhete-agendados', '* * * * *', $cron$
+  select net.http_post(
+    url := '${url}',
+    headers := '{"Content-Type": "application/json", "x-bilhete-token": "${tok}"}'::jsonb,
+    body := '{"tick": true}'::jsonb);
+$cron$);`;
+ document.getElementById('out').innerHTML=`<h2>1. Secrets do Supabase</h2><p>Edge Functions › <b>Secrets</b> › adicione os três (nome exatamente assim):</p>
+ ${box('VAPID_PUBLIC',pub)}${box('VAPID_PRIVATE',priv,'<span class="warn">Secreta: não compartilhe com ninguém.</span>')}${box('NOTIFY_TOKEN',tok,'<span class="warn">Secreta.</span>')}
+ <h2>2. SQL Editor</h2><p>Cole e clique em Run (o token já está preenchido):</p>${box('SQL',sql,'',true)}
+ <h2>3. Mande para o Claude</h2><p>Só a chave <b>pública</b> (VAPID_PUBLIC). Ela vai no site.</p>`;
+ document.getElementById('g').disabled=true};
+</script></body></html>
