@@ -27,3 +27,9 @@ Um cantinho só nosso para trocar bilhetes, rabiscos e listas — em tempo real,
 
 ---
 Feito com carinho por Déco, para a Maju. 🌊
+
+## Configurar (uma vez)
+1. Supabase › New project. SQL Editor › colar `supabase/schema.sql` › Run.
+2. Authentication › Sign In / Providers › Email: desligar "Allow new users to sign up" e "Confirm email".
+3. Authentication › Users › Add user: `andre@bilhete.app` e `maju@bilhete.app` (com Auto Confirm).
+4. Project Settings › API: colar Project URL e anon public key em `config.js`.
