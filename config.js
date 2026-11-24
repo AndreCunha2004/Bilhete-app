@@ -1,6 +1,6 @@
-/* Preencha com os dados do seu projeto Supabase (Project Settings › API).
-   Os dois valores são públicos: a proteção dos dados fica nas regras do banco (schema.sql). */
+/* Projeto Supabase do Bilhete. Os dois valores são públicos:
+   a proteção dos dados fica nas regras do banco (supabase/schema.sql). */
 window.BILHETE_CFG = {
-  url: 'COLE_A_PROJECT_URL_AQUI',
-  anon: 'COLE_A_ANON_KEY_AQUI'
+  url: 'https://iulvegutcmzrazaihjdy.supabase.co',
+  anon: 'sb_publishable_xOup3v4t2N6DsbVA3_lmOw_otzQDdwi'
 };
