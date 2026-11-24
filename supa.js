@@ -217,6 +217,39 @@
     return rows.length;
   };
 
+  /* ---------------- notificações no celular ---------------- */
+  const b64 = s => { const p = '='.repeat((4 - s.length % 4) % 4), r = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from(r, c => c.charCodeAt(0)); };
+  const hashOf = async t => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t))).slice(0, 8), b => b.toString(16).padStart(2, '0')).join('');
+  const standalone = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+  window.bilhetePushStatus = () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return /iPhone|iPad/.test(navigator.userAgent) && !standalone() ? 'instalar' : 'sem-suporte';
+    return Notification.permission; // default | granted | denied
+  };
+  async function salvarSub(sub) {
+    const j = sub.toJSON(), id = uname + '_' + await hashOf(j.endpoint);
+    await put('push/' + id, { by: uname, sub: j, ua: navigator.userAgent.slice(0, 120), at: Date.now() });
+  }
+  window.bilhetePush = async () => {
+    await ready;
+    const st = window.bilhetePushStatus();
+    if (st === 'instalar') return { ok: false, msg: 'Primeiro adicione o Bilhete à Tela de Início (Safari › Compartilhar) e abra por lá.' };
+    if (st === 'sem-suporte') return { ok: false, msg: 'Este navegador não aceita notificações.' };
+    if (!CFG.vapid) return { ok: false, msg: 'Notificações ainda não configuradas.' };
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return { ok: false, msg: 'Permissão negada. Ative em Ajustes › Notificações › Bilhete.' };
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64(CFG.vapid) });
+    await salvarSub(sub);
+    return { ok: true, msg: 'Notificações ativadas neste aparelho.' };
+  };
+  // mantém a inscrição atualizada e limpa o selo do ícone ao abrir
+  ready.then(async () => {
+    try { if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (_) {}
+    try { if (window.bilhetePushStatus() === 'granted' && CFG.vapid) { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) await salvarSub(sub); } } catch (e) { console.warn('push', e); }
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {}); });
+
   /* ---------------- ponte claude.use ---------------- */
   const caps = { db, user, room, downloads };
   window.claude = { use: async n => { if (!(n in caps)) return null; await ready; return caps[n]; } };
