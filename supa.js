@@ -45,7 +45,8 @@
       b.disabled = true; b.textContent = 'Entrando…'; er.textContent = '';
       const { data, error } = await sb.auth.signInWithPassword({ email: u + '@' + DOMAIN, password: p });
       b.disabled = false; b.textContent = 'Entrar';
-      if (error || !data.session) { er.textContent = 'Usuário ou senha incorretos.'; return; }
+      if (error || !data.session) { const m = String((error && (error.message || error.code)) || ''); console.warn('login', error);
+        er.textContent = /confirm/i.test(m) ? 'Essa conta ainda não foi confirmada no Supabase (Auto Confirm).' : /disabled|not enabled|provider/i.test(m) ? 'O login por e-mail está desligado no Supabase.' : /invalid.*credential|invalid login/i.test(m) ? 'Usuário ou senha incorretos.' : /fetch|network/i.test(m) ? 'Sem conexão com o banco. Confira a internet.' : 'Não deu para entrar: ' + m; return; }
       start(data.session);
     });
     setTimeout(() => { const i = document.getElementById('bw-u'); if (i) i.focus(); }, 50);
