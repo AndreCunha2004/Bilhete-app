@@ -303,6 +303,16 @@
     const j = sub.toJSON(), id = uname + '_' + await hashOf(j.endpoint);
     await put('push/' + id, { by: uname, sub: j, ua: navigator.userAgent.slice(0, 120), at: Date.now() });
   }
+  window.bilhetePushAtivo = async () => {
+    try { if (window.bilhetePushStatus() !== 'granted') return false; const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((_, no) => setTimeout(() => no(0), 3000))]); return !!(await reg.pushManager.getSubscription()); } catch (_) { return false; }
+  };
+  window.bilhetePushOff = async () => {
+    await ready;
+    try { const reg = await navigator.serviceWorker.ready, sub = await reg.pushManager.getSubscription();
+      if (sub) { const id = uname + '_' + await hashOf(sub.toJSON().endpoint); await sub.unsubscribe(); await sb.from('docs').delete().eq('path', 'push/' + id); }
+      return { ok: true, msg: 'Notificações desativadas neste aparelho.' };
+    } catch (e) { return { ok: false, msg: 'Não deu para desativar agora.' }; }
+  };
   window.bilhetePush = async () => {
     await ready;
     const st = window.bilhetePushStatus();
