@@ -167,26 +167,63 @@
   const user = { id: async () => { await ready; return uname; }, can: async () => { await ready; return true; } };
 
   /* ---------------- room (presença em tempo real) ---------------- */
-  const tab = rid().slice(0, 8);
-  let rch = null, mine = {}, peerFns = new Set(), lastPeers = [], tT = 0;
+  // Online/offline confiável no iPhone: sai na hora ao ir para segundo plano, renova a cada 20 s
+  // e ignora "fantasmas" (aparelho que dormiu sem avisar) com mais de 60 s sem renovar.
+  const tab = rid().slice(0, 8), STALE = 60e3, BEAT = 20e3;
+  let rch = null, mine = {}, peerFns = new Set(), lastPeers = [], tT = 0, rjT = 0;
+  const myKey = () => uname + ':' + tab;
   function peersNow() {
     if (!rch) return [];
-    const st = rch.presenceState(), out = [];
-    for (const k in st) { const metas = st[k] || []; const m = metas[metas.length - 1]; if (!m) continue; out.push({ peer: k, by: m.by, isMe: k === uname + ':' + tab, sameTab: k === uname + ':' + tab, kind: 'viewer', presence: m.p || {}, updatedAt: m.at || 0 }); }
+    const st = rch.presenceState(), out = [], now = Date.now();
+    for (const k in st) {
+      const metas = st[k] || []; const m = metas[metas.length - 1]; if (!m) continue;
+      const me = k === myKey();
+      if (!me && (m.hidden || now - (m.at || 0) > STALE)) continue;
+      out.push({ peer: k, by: m.by, isMe: me, sameTab: me, kind: 'viewer', presence: m.p || {}, updatedAt: m.at || 0 });
+    }
     return out;
   }
-  function emit() { const peers = peersNow(); const prev = lastPeers; lastPeers = peers; peerFns.forEach(f => { try { f({ peers, joined: peers.filter(p => !prev.some(q => q.peer === p.peer)), left: prev.filter(p => !peers.some(q => q.peer === p.peer)), updated: peers }); } catch (e) { console.warn(e); } }); }
+  function emit() {
+    const peers = peersNow(), prev = lastPeers; lastPeers = peers;
+    const sig = p => p.map(x => x.peer + JSON.stringify(x.presence)).sort().join('|');
+    if (sig(peers) === sig(prev) && prev.length === peers.length && peerFns.size && emit.done) return;
+    emit.done = true;
+    peerFns.forEach(f => { try { f({ peers, joined: peers.filter(p => !prev.some(q => q.peer === p.peer)), left: prev.filter(p => !peers.some(q => q.peer === p.peer)), updated: peers }); } catch (e) { console.warn(e); } });
+  }
+  function rejoin(delay) {
+    clearTimeout(rjT);
+    rjT = setTimeout(() => { if (rch) { try { sb.removeChannel(rch); } catch (_) {} rch = null; } ensureRoom(); }, delay || 0);
+  }
   async function ensureRoom() {
     await ready; if (rch) return;
-    rch = sb.channel('sala', { config: { presence: { key: uname + ':' + tab } } });
-    rch.on('presence', { event: 'sync' }, emit).subscribe(s => { if (s === 'SUBSCRIBED') track(); });
+    const ch = sb.channel('sala', { config: { presence: { key: myKey() } } });
+    rch = ch;
+    ch.on('presence', { event: 'sync' }, emit).on('presence', { event: 'join' }, emit).on('presence', { event: 'leave' }, emit)
+      .subscribe(st => {
+        if (st === 'SUBSCRIBED') track(true);
+        else if ((st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') && rch === ch && !document.hidden) rejoin(2000);
+      });
   }
-  function track() { clearTimeout(tT); tT = setTimeout(() => { if (rch) rch.track({ by: uname, p: mine, at: Date.now() }).catch(() => {}); }, 60); }
+  function track(now) {
+    clearTimeout(tT);
+    const go = () => { if (rch && !document.hidden) rch.track({ by: uname, p: mine, at: Date.now() }).catch(() => {}); };
+    if (now) go(); else tT = setTimeout(go, 60);
+  }
+  function sair() { clearTimeout(tT); if (rch) { try { rch.untrack(); } catch (_) {} } }
+  function voltar() {
+    if (!sb || !uname) return;
+    try { if (sb.realtime && !sb.realtime.isConnected()) sb.realtime.connect(); } catch (_) {}
+    if (!rch || rch.state !== 'joined') rejoin(0); else { track(true); emit(); }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) sair(); else voltar(); });
+  window.addEventListener('pagehide', sair);
+  window.addEventListener('pageshow', () => { if (!document.hidden) voltar(); });
+  window.addEventListener('online', () => voltar());
+  setInterval(() => { if (document.hidden || !rch) return; if (rch.state !== 'joined') rejoin(0); else track(true); emit(); }, BEAT);
   const room = {
     presence: async o => { mine = { ...mine, ...(o || {}) }; Object.keys(mine).forEach(k => { if (mine[k] == null) delete mine[k]; }); await ensureRoom(); track(); },
-    onPeers: (fn) => { peerFns.add(fn); ensureRoom().then(() => setTimeout(emit, 0)); return () => peerFns.delete(fn); }
+    onPeers: (fn) => { peerFns.add(fn); ensureRoom().then(() => setTimeout(() => { emit.done = false; emit(); }, 0)); return () => peerFns.delete(fn); }
   };
-  document.addEventListener('visibilitychange', () => { if (!document.hidden && rch) track(); });
 
   /* ---------------- downloads ---------------- */
   const downloads = {
