@@ -91,5 +91,8 @@ rep('</head>','<style>.dgr{display:flex;gap:10px;align-items:flex-start;padding:
 rep('</body>', '''<script>if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>''')
 
+import time as _t
+BUILD_V = str(int(_t.time()))
+s = s.replace('src="config.js"', 'src="config.js?v=' + BUILD_V + '"').replace('src="supa.js"', 'src="supa.js?v=' + BUILD_V + '"')
 pathlib.Path('index.html').write_text(s, encoding='utf-8')
 print('ok', len(s))
