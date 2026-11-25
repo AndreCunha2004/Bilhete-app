@@ -251,7 +251,7 @@
     await ready;
     const { data } = await sb.auth.getSession(); const tok = data && data.session && data.session.access_token;
     try {
-      const res = await fetch(CFG.url.replace(/\/$/, '') + '/functions/v1/notificar', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok, apikey: CFG.anon }, body: JSON.stringify({ teste_push: true }) });
+      const res = await fetch(CFG.url.replace(/\/$/, '') + '/functions/v1/Notificar', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok, apikey: CFG.anon }, body: JSON.stringify({ teste_push: true }) });
       const txt = await res.text(); let j = null; try { j = JSON.parse(txt); } catch (_) {}
       return { status: res.status, ...(j || { texto: txt.slice(0, 200) }) };
     } catch (e) { return { status: 0, erro: 'Não alcançou a função (rede ou CORS). Confira se ela se chama notificar e está publicada.' }; }
