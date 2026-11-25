@@ -1,7 +1,7 @@
 /* Service worker do Bilhete: deixa instalar como app e guarda a casca para abrir rápido.
    Os dados sempre vêm do Supabase (nunca do cache). As notificações entram aqui na próxima etapa. */
-const V = 'bilhete-v6';
-const SHELL = ['./', 'index.html', 'supa.js', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png',
+const V = 'bilhete-v7';
+const SHELL = ['./', 'index.html', 'vendor/supabase-2.119.2.js', 'supa.js', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png',
   'fonts/caveat-latin-500-normal.woff2', 'fonts/caveat-latin-700-normal.woff2', 'fonts/dm-sans-latin-400-normal.woff2', 'fonts/dm-sans-latin-500-normal.woff2', 'fonts/dm-sans-latin-700-normal.woff2'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))).then(() => self.clients.claim())); });

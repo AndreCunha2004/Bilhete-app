@@ -27,10 +27,17 @@ async function umaVez(chave: string) { // true só na primeira chamada do dia/ro
 async function nicks() { const c = await getDoc("casal/config"); return { a: c?.slots?.a?.nick || "Déco", b: c?.slots?.b?.nick || "Juju", inicio: /^\d{4}-\d{2}-\d{2}$/.test(c?.inicio || "") ? c.inicio : "2025-12-05" }; }
 async function pushPara(slot: string, msg: Msg) {
   const { data: subs } = await sb.from("docs").select("path,data").eq("col", "push").eq("data->>by", SLOT_USER[slot]);
+  const res: { aparelho: string; ok: boolean; status?: number; erro?: string }[] = [];
+  console.log("push para", SLOT_USER[slot], "inscrições:", subs?.length ?? 0, "|", msg.title);
   for (const s of subs ?? []) {
-    try { await webpush.sendNotification(s.data.sub, JSON.stringify({ ...msg, url: "./" }), { TTL: 86400 }); }
-    catch (e: any) { if (e?.statusCode === 404 || e?.statusCode === 410) await sb.from("docs").delete().eq("path", s.path); else console.error("push", e?.statusCode, e?.body); }
+    const ap = String(s.data?.ua || "").replace(/^.*\((iPhone|iPad|Macintosh|Android|Windows)[^)]*\).*$/, "$1") || s.path;
+    try { await webpush.sendNotification(s.data.sub, JSON.stringify({ ...msg, url: "./" }), { TTL: 86400 }); res.push({ aparelho: ap, ok: true }); }
+    catch (e: any) {
+      res.push({ aparelho: ap, ok: false, status: e?.statusCode, erro: String(e?.body || e?.message || e).slice(0, 160) });
+      if (e?.statusCode === 404 || e?.statusCode === 410) await sb.from("docs").delete().eq("path", s.path); else console.error("push falhou", e?.statusCode, e?.body || e?.message);
+    }
   }
+  return res;
 }
 function agoraBR() { const d = new Date(Date.now() - 3 * 3600e3); return { data: d.toISOString().slice(0, 10), hm: d.toISOString().slice(11, 16), y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() }; }
 
@@ -122,9 +129,26 @@ async function lembrete20(dia: string) {
   }
 }
 
+const CORS = { "Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "authorization, apikey, content-type, x-bilhete-token", "Access-Control-Allow-Methods": "POST, OPTIONS" };
+const json = (o: unknown, status = 200) => new Response(JSON.stringify(o), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+
 Deno.serve(async (req) => {
-  if (req.headers.get("x-bilhete-token") !== Deno.env.get("NOTIFY_TOKEN")) return new Response("não autorizado", { status: 401 });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   const body = await req.json().catch(() => ({}));
+  // teste pelo app: usa o login de quem pede e manda a notificação para os aparelhos dele mesmo
+  if (body.teste_push) {
+    const jwt = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
+    const { data: u } = await sb.auth.getUser(jwt);
+    const nome = String(u?.user?.email || "").split("@")[0];
+    const slot = Object.keys(SLOT_USER).find((k) => SLOT_USER[k] === nome);
+    if (!slot) return json({ ok: false, erro: "Login não reconhecido." }, 401);
+    const segredos = { VAPID_PUBLIC: !!Deno.env.get("VAPID_PUBLIC"), VAPID_PRIVATE: !!Deno.env.get("VAPID_PRIVATE"), NOTIFY_TOKEN: !!Deno.env.get("NOTIFY_TOKEN"), ANTHROPIC_API_KEY: !!AI_KEY };
+    const envios = await pushPara(slot, { title: "Teste do Bilhete 💌", body: "Se você está vendo isto, as notificações funcionam.", tag: "teste" });
+    console.log("teste", nome, JSON.stringify(envios));
+    return json({ ok: envios.some((e) => e.ok), segredos, envios });
+  }
+  if (req.headers.get("x-bilhete-token") !== Deno.env.get("NOTIFY_TOKEN")) { console.warn("chamada sem token válido"); return new Response("não autorizado", { status: 401 }); }
+  console.log("chamada", body.path ? "atividade " + body.path : body.tick ? "tick" : "?");
   let n = 0;
   if (body.path) {
     const { data } = await sb.from("docs").select("path,data").eq("path", body.path).maybeSingle();
@@ -144,5 +168,5 @@ Deno.serve(async (req) => {
     if (h.hm >= "20:00" && h.hm < "20:10") await lembrete20(h.data);
     if (body.teste === "namoro") await datasNamoro({ ...h, data: "teste-" + agora });
   }
-  return new Response(JSON.stringify({ ok: true, enviados: n }), { headers: { "Content-Type": "application/json" } });
+  return json({ ok: true, enviados: n });
 });

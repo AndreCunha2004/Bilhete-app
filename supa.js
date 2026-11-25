@@ -51,13 +51,14 @@
       const { data, error } = await sb.auth.signInWithPassword({ email: u + '@' + DOMAIN, password: p });
       b.disabled = false; b.textContent = 'Entrar';
       if (error || !data.session) { const m = String((error && (error.message || error.code)) || ''); console.warn('login', error);
-        er.textContent = /confirm/i.test(m) ? 'Essa conta ainda não foi confirmada no Supabase (Auto Confirm).' : /disabled|not enabled|provider/i.test(m) ? 'O login por e-mail está desligado no Supabase.' : /invalid.*credential|invalid login/i.test(m) ? 'Senha incorreta para ' + u + '. Toque em Mostrar para conferir.' : /fetch|network/i.test(m) ? 'Sem conexão com o banco. Confira a internet.' : 'Não deu para entrar: ' + m; return; }
+        er.textContent = /confirm/i.test(m) ? 'Essa conta ainda não foi confirmada no Supabase (Auto Confirm).' : /disabled|not enabled|provider/i.test(m) ? 'O login por e-mail está desligado no Supabase.' : /invalid.*credential|invalid login/i.test(m) ? 'Senha incorreta para ' + u + '. Toque em Mostrar para conferir.' : /fetch|network/i.test(m) ? 'Sem conexão com o banco. Confira a internet.' : 'Não deu para entrar agora. Tente de novo em instantes.'; return; }
       start(data.session);
     });
     setTimeout(() => { const i = document.getElementById('bw-u'); if (i) i.focus(); }, 50);
   }
   function start(session) {
     uname = String(session.user.email || '').split('@')[0]; window.bilheteUser = uname;
+    try { sb.realtime.setAuth(session.access_token); } catch (_) {}
     closeOverlay(); resolveReady(true);
   }
   window.bilheteSair = async () => { try { await sb.auth.signOut(); } catch (e) {} location.reload(); };
@@ -71,7 +72,7 @@
     window.__sb = sb;
     const { data } = await sb.auth.getSession();
     if (data && data.session) start(data.session); else showLogin();
-    sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_OUT') location.reload(); });
+    sb.auth.onAuthStateChange((ev, ses) => { if (ev === 'SIGNED_OUT') location.reload(); else if (ses && ses.access_token) { try { sb.realtime.setAuth(ses.access_token); } catch (_) {} } });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
@@ -190,18 +191,27 @@
     emit.done = true;
     peerFns.forEach(f => { try { f({ peers, joined: peers.filter(p => !prev.some(q => q.peer === p.peer)), left: prev.filter(p => !peers.some(q => q.peer === p.peer)), updated: peers }); } catch (e) { console.warn(e); } });
   }
+  let modo = 'private', ultimoErro = '', rejoining = false, ultimoSync = 0;
   function rejoin(delay) {
     clearTimeout(rjT);
-    rjT = setTimeout(() => { if (rch) { try { sb.removeChannel(rch); } catch (_) {} rch = null; } ensureRoom(); }, delay || 0);
+    rjT = setTimeout(async () => {
+      if (rejoining) return; rejoining = true;
+      try { if (rch) { const old = rch; rch = null; await sb.removeChannel(old); } } catch (_) {}
+      rejoining = false; ensureRoom();
+    }, delay || 0);
   }
   async function ensureRoom() {
-    await ready; if (rch) return;
-    const ch = sb.channel('sala', { config: { presence: { key: myKey() } } });
+    await ready; if (rch || rejoining) return;
+    const ch = sb.channel('sala', { config: { private: modo === 'private', presence: { key: myKey() } } });
     rch = ch;
-    ch.on('presence', { event: 'sync' }, emit).on('presence', { event: 'join' }, emit).on('presence', { event: 'leave' }, emit)
-      .subscribe(st => {
-        if (st === 'SUBSCRIBED') track(true);
-        else if ((st === 'CHANNEL_ERROR' || st === 'TIMED_OUT' || st === 'CLOSED') && rch === ch && !document.hidden) rejoin(2000);
+    const sync = () => { ultimoSync = Date.now(); emit(); };
+    ch.on('presence', { event: 'sync' }, sync).on('presence', { event: 'join' }, sync).on('presence', { event: 'leave' }, sync)
+      .subscribe((st, e) => {
+        if (st === 'SUBSCRIBED') { ultimoErro = ''; track(true); return; }
+        if (rch !== ch) return;
+        ultimoErro = st + (e && e.message ? ': ' + e.message : '');
+        if (st === 'CHANNEL_ERROR' && modo === 'private') { modo = 'public'; rejoin(0); return; } // sem a regra de tempo real privado no banco: usa canal público
+        if (!document.hidden) rejoin(3000);
       });
   }
   function track(now) {
@@ -213,16 +223,38 @@
   function voltar() {
     if (!sb || !uname) return;
     try { if (sb.realtime && !sb.realtime.isConnected()) sb.realtime.connect(); } catch (_) {}
-    if (!rch || rch.state !== 'joined') rejoin(0); else { track(true); emit(); }
+    if (!rch || rch.state === 'closed' || rch.state === 'errored') rejoin(0); else { track(true); emit(); }
   }
   document.addEventListener('visibilitychange', () => { if (document.hidden) sair(); else voltar(); });
   window.addEventListener('pagehide', sair);
   window.addEventListener('pageshow', () => { if (!document.hidden) voltar(); });
   window.addEventListener('online', () => voltar());
-  setInterval(() => { if (document.hidden || !rch) return; if (rch.state !== 'joined') rejoin(0); else track(true); emit(); }, BEAT);
+  setInterval(() => { if (document.hidden || !rch) return; if (rch.state === 'closed' || rch.state === 'errored') rejoin(0); else if (rch.state === 'joined') track(true); emit(); }, BEAT);
   const room = {
     presence: async o => { mine = { ...mine, ...(o || {}) }; Object.keys(mine).forEach(k => { if (mine[k] == null) delete mine[k]; }); await ensureRoom(); track(); },
     onPeers: (fn) => { peerFns.add(fn); ensureRoom().then(() => setTimeout(() => { emit.done = false; emit(); }, 0)); return () => peerFns.delete(fn); }
+  };
+
+  /* ---------------- diagnóstico ---------------- */
+  window.bilheteDiag = async () => {
+    await ready;
+    const r = { usuario: uname, conectado: false, canal: rch ? rch.state : 'sem canal', modo, ultimoErro, ultimoSync, online: [], aparelhoInscrito: false, inscricoesNoBanco: 0, atividades: [] };
+    try { r.conectado = sb.realtime.isConnected(); } catch (_) {}
+    r.online = peersNow().filter(p => !p.isMe).map(p => p.by + (p.presence && p.presence.mode ? ' (' + p.presence.mode + ')' : ''));
+    r.push = window.bilhetePushStatus ? window.bilhetePushStatus() : '?';
+    try { const reg = await Promise.race([navigator.serviceWorker.ready, new Promise((_, no) => setTimeout(() => no(new Error('sw')), 3000))]); r.aparelhoInscrito = !!(await reg.pushManager.getSubscription()); } catch (_) {}
+    try { const { data } = await sb.from('docs').select('path').eq('col', 'push').eq('data->>by', uname); r.inscricoesNoBanco = (data || []).length; } catch (_) {}
+    try { const { data } = await sb.from('docs').select('data').eq('col', 'atividades').order('data->at', { ascending: false }).limit(8); r.atividades = (data || []).map(x => ({ t: x.data.t, by: x.data.by, at: x.data.at, pushed: !!x.data.pushed })); } catch (_) {}
+    return r;
+  };
+  window.bilheteTestePush = async () => {
+    await ready;
+    const { data } = await sb.auth.getSession(); const tok = data && data.session && data.session.access_token;
+    try {
+      const res = await fetch(CFG.url.replace(/\/$/, '') + '/functions/v1/notificar', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok, apikey: CFG.anon }, body: JSON.stringify({ teste_push: true }) });
+      const txt = await res.text(); let j = null; try { j = JSON.parse(txt); } catch (_) {}
+      return { status: res.status, ...(j || { texto: txt.slice(0, 200) }) };
+    } catch (e) { return { status: 0, erro: 'Não alcançou a função (rede ou CORS). Confira se ela se chama notificar e está publicada.' }; }
   };
 
   /* ---------------- downloads ---------------- */

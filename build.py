@@ -20,7 +20,7 @@ rep('<title>Bilhete</title>', '''<title>Bilhete</title>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="vendor/supabase-2.119.2.js"></script>
 <script src="config.js"></script>
 <script src="supa.js"></script>''')
 
@@ -60,10 +60,25 @@ function openNotif(){const st=window.bilhetePushStatus(),pr=S.prefs||{},on=k=>pr
  <div class="field"><span class="lbl">O que avisar</span>
  <label class="ck"><input type="checkbox" checked disabled>Bilhetes, amei, listas, humor e pergunta do dia</label>
  <label class="ck"><input type="checkbox" data-pref="datas"${on('datas')?' checked':''}>Mesversário e aniversário de namoro</label>
- <label class="ck"><input type="checkbox" data-pref="lembrete20"${on('lembrete20')?' checked':''}>Lembrete às 20h se eu ainda não mandei nada no dia</label></div>`,
+ <label class="ck"><input type="checkbox" data-pref="lembrete20"${on('lembrete20')?' checked':''}>Lembrete às 20h se eu ainda não mandei nada no dia</label></div>
+ <div class="rows">${mrow(I.info,'Diagnóstico','Conexão, presença e teste de notificação','data-page="diag"')}</div>`,
  ()=>{const b=$('#pushbtn');if(b)b.addEventListener('click',async()=>{b.disabled=true;const r=await window.bilhetePush().catch(e=>({msg:'Não deu para ativar: '+(e&&e.message||e)}));b.disabled=false;toast(r.msg);if(r.ok){closeSheet();openNotif()}});
   $('#sheet').querySelectorAll('[data-pref]').forEach(c=>c.addEventListener('change',async()=>{const np={...(S.prefs||{}),[c.dataset.pref]:c.checked};S.prefs=np;try{await S.db.doc('prefs/'+S.me).set(np)}catch(err){handleErr(err)}}))},null,{label:'Notificações',reopen:openNotif})}
-function openPage(n){if(n==='perfil')openProfile();else if(n==='namoro')openNamoro();else if(n==='notif')openNotif()}
+async function openDiag(){openSheet(`<div class="sh-head"><h2>Diagnóstico</h2><button type="button" class="tool" data-close aria-label="Fechar">${I.close}</button></div><div id="dgbox"><p class="fine">Verificando…</p></div>
+ <button type="button" class="btn primary block" id="dgtest">Enviar notificação de teste</button><div id="dgres"></div>`,
+ ()=>{const ok=(c,t,d)=>`<div class="dgr ${c?'ok':'no'}"><span aria-hidden="true">${c?'✓':'!'}</span><div><b>${t}</b>${d?`<small>${d}</small>`:''}</div></div>`;
+  window.bilheteDiag().then(r=>{const P=esc(nick(other())),mine=r.atividades.find(a=>a.by===S.me&&Date.now()-a.at>45000),ent=mine?mine.pushed:null;
+   $('#dgbox').innerHTML=ok(r.conectado,'Conexão em tempo real',r.conectado?'Conectado':'Sem conexão. Confira a internet e reabra o app.')
+   +ok(r.canal==='joined','Canal de presença',r.canal==='joined'?'Ativo ('+(r.modo==='private'?'privado':'público')+')':'Estado: '+esc(r.canal)+(r.ultimoErro?' · '+esc(r.ultimoErro):''))
+   +ok(true,'Quem está online agora',r.online.length?esc(r.online.join(', ')):P+' não está com o app aberto')
+   +ok(r.push==='granted','Permissão de notificação',esc(pushTxt()))
+   +ok(r.aparelhoInscrito&&r.inscricoesNoBanco>0,'Este aparelho inscrito',r.aparelhoInscrito?(r.inscricoesNoBanco?'Sim, salvo no banco':'Inscrito, mas não salvo no banco. Toque em Reconectar.'):'Não. Toque em Ativar em Notificações.')
+   +ok(ent!==false,'Entrega da sua última atividade',ent===null?'Ainda sem atividade sua para conferir':ent?'A função recebeu e processou':'A função não processou. Confira se “Verify JWT” está desligado na função notificar.')}).catch(e=>{$('#dgbox').innerHTML='<p class="fine">Não deu para verificar: '+esc(String(e&&e.message||e))+'</p>'});
+  $('#dgtest').addEventListener('click',async()=>{const bt=$('#dgtest');bt.disabled=true;bt.textContent='Enviando…';const r=await window.bilheteTestePush();bt.disabled=false;bt.textContent='Enviar notificação de teste';
+   let h='';if(r.status===0)h=ok(false,'Função inacessível',esc(r.erro));else if(r.status===404)h=ok(false,'Função não encontrada','Confira se ela se chama exatamente notificar.');else if(r.status===401&&!r.segredos)h=ok(false,'Função recusou o pedido','Atualize o código da função notificar no Supabase (versão com teste).');else if(r.segredos){const falta=Object.entries(r.segredos).filter(([k,v])=>!v&&k!=='ANTHROPIC_API_KEY').map(([k])=>k);
+    h=ok(!falta.length,'Secrets da função',falta.length?'Faltando: '+esc(falta.join(', ')):'Todos configurados')+(r.envios&&r.envios.length?r.envios.map(e=>ok(e.ok,'Envio para '+esc(e.aparelho),e.ok?'Enviado. Deve aparecer em segundos.':'Falhou'+(e.status?' ('+e.status+')':'')+': '+esc(e.erro||''))).join(''):ok(false,'Nenhum aparelho seu inscrito','Ative as notificações neste iPhone primeiro.'))}else h=ok(false,'Resposta inesperada',esc(JSON.stringify(r).slice(0,200)));
+   $('#dgres').innerHTML=h})},null,{label:'Diagnóstico',reopen:openDiag})}
+function openPage(n){if(n==='perfil')openProfile();else if(n==='namoro')openNamoro();else if(n==='notif')openNotif();else if(n==='diag')openDiag()}
 """ + s[j:]
 rep("async function afterSend(carta,title){", "async function afterSend(carta,title){return;")
 rep("Ligado à sua conta Claude. Fica fixo neste perfil.", "Ligado ao seu login. Fica fixo neste perfil.")
@@ -72,6 +87,7 @@ rep("function perguntaHoje(){", "function perguntaHoje(){if(S.qia&&S.qia.date===
 rep("  S.respUnsub=S.db.collection('perguntas')", "  if(S.qiaUnsub)S.qiaUnsub();S.qiaUnsub=S.db.doc('sistema/pergunta-'+t).onSnapshot(d=>{const v=d.exists?d.data():null;S.qia=v&&typeof v.q==='string'?{date:t,q:v.q.slice(0,200)}:null;const b=document.querySelector('[data-hsec=pergunta]');if(b&&S.view==='hoje'&&!(document.activeElement&&document.activeElement.id==='pqin')&&!(S.resp&&S.resp[S.me]))b.innerHTML=perguntaHtml()},()=>{});\n  S.respUnsub=S.db.collection('perguntas')")
 
 # service worker (necessário para instalar e, depois, para notificações)
+rep('</head>','<style>.dgr{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--surface);margin-bottom:6px}.dgr>span{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;background:#4C7A4C}.dgr.no>span{background:#B57056}.dgr small{display:block;color:var(--muted)}#dgres{margin-top:10px}</style></head>')
 rep('</body>', '''<script>if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));</script>
 </body>''')
 
