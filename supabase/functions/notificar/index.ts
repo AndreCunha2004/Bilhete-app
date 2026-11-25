@@ -1,5 +1,8 @@
-// Função "notificar": manda notificação no celular do outro quando há atividade nova.
-// Secrets necessários (Edge Functions › Secrets): VAPID_PUBLIC, VAPID_PRIVATE, NOTIFY_TOKEN
+// Função "notificar": avisos no celular do Bilhete.
+// - atividade nova (bilhete, amei, lista, humor, pergunta) → avisa o outro
+// - a cada minuto (tick): bilhetes agendados que chegaram, e as rotinas do dia (horário de Brasília):
+//     00:05 pergunta do dia (IA) · 09:00 mesversário / aniversário de namoro · 20:00 lembrete de quem não mandou nada
+// Secrets: VAPID_PUBLIC, VAPID_PRIVATE, NOTIFY_TOKEN e (opcional) ANTHROPIC_API_KEY para as frases e perguntas com IA.
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -7,11 +10,53 @@ const URL_ = Deno.env.get("SUPABASE_URL")!;
 const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? (JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}").default);
 const sb = createClient(URL_, KEY, { auth: { persistSession: false } });
 webpush.setVapidDetails("mailto:andre@bilhete.app", Deno.env.get("VAPID_PUBLIC")!, Deno.env.get("VAPID_PRIVATE")!);
+const AI_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
 const SLOT_USER: Record<string, string> = { a: "andre", b: "maju" };
+const outro = (s: string) => (s === "a" ? "b" : "a");
 const q = (s?: string) => (s ? `“${s}”` : "");
+type Msg = { title: string; body: string; tag: string };
 
-function texto(a: any, nick: string): { title: string; body: string; tag: string } | null {
+/* ---------- utilidades ---------- */
+async function getDoc(path: string) { const { data } = await sb.from("docs").select("data").eq("path", path).maybeSingle(); return data?.data ?? null; }
+async function setDoc(path: string, data: unknown) { const col = path.split("/").slice(0, -1).join("/"), id = path.split("/").pop()!; await sb.from("docs").upsert({ path, col, id, data, updated_at: new Date().toISOString() }); }
+async function umaVez(chave: string) { // true só na primeira chamada do dia/rotina
+  const { error } = await sb.from("docs").insert({ path: "sistema/" + chave, col: "sistema", id: chave, data: { at: Date.now() } });
+  return !error;
+}
+async function nicks() { const c = await getDoc("casal/config"); return { a: c?.slots?.a?.nick || "Déco", b: c?.slots?.b?.nick || "Juju", inicio: /^\d{4}-\d{2}-\d{2}$/.test(c?.inicio || "") ? c.inicio : "2025-12-05" }; }
+async function pushPara(slot: string, msg: Msg) {
+  const { data: subs } = await sb.from("docs").select("path,data").eq("col", "push").eq("data->>by", SLOT_USER[slot]);
+  for (const s of subs ?? []) {
+    try { await webpush.sendNotification(s.data.sub, JSON.stringify({ ...msg, url: "./" }), { TTL: 86400 }); }
+    catch (e: any) { if (e?.statusCode === 404 || e?.statusCode === 410) await sb.from("docs").delete().eq("path", s.path); else console.error("push", e?.statusCode, e?.body); }
+  }
+}
+function agoraBR() { const d = new Date(Date.now() - 3 * 3600e3); return { data: d.toISOString().slice(0, 10), hm: d.toISOString().slice(11, 16), y: d.getUTCFullYear(), m: d.getUTCMonth() + 1, d: d.getUTCDate() }; }
+
+/* ---------- IA (opcional) ---------- */
+async function contexto() {
+  const { data } = await sb.from("docs").select("data").eq("col", "bilhetes").order("data->createdAt", { ascending: false }).limit(12);
+  return (data ?? []).map((r: any) => [r.data?.title, (r.data?.text || "").slice(0, 140)].filter(Boolean).join(": ")).filter(Boolean).join("\n");
+}
+async function ia(pedido: string, fallback: string) {
+  if (!AI_KEY) return fallback;
+  try {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "x-api-key": AI_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+      body: JSON.stringify({ model: "claude-haiku-5-5", max_tokens: 160, messages: [{ role: "user", content: pedido }] }),
+    });
+    const j = await r.json();
+    const t = String(j?.content?.[0]?.text || "").trim().replace(/^["“]|["”]$/g, "");
+    return t && t.length < 220 ? t : fallback;
+  } catch (e) { console.error("ia", e); return fallback; }
+}
+const FRASES = ["Cada mês ao seu lado é o meu lugar favorito no calendário.", "A gente vai somando dias, e eu só quero somar mais.", "Mais um mês de nós dois, e o coração ainda acelera igual.", "Distância nenhuma diminui o que a gente constrói todo dia.", "Obrigado por escolher a gente de novo, todo mês."];
+const frase = () => FRASES[Math.floor(Math.random() * FRASES.length)];
+
+/* ---------- textos das atividades ---------- */
+function texto(a: any, nick: string): Msg | null {
   const k = a.kind === "carta" ? "carta" : "desenho";
   switch (a.t) {
     case "nota_nova": return { title: `${nick} te mandou ${k === "carta" ? "uma carta" : "um desenho"} 💌`, body: a.title || a.snip || "Abra para ver", tag: "nota" };
@@ -20,27 +65,61 @@ function texto(a: any, nick: string): { title: string; body: string; tag: string
     case "item_novo": return { title: `${nick} adicionou ${q(a.title)}`, body: a.list ? `na lista ${q(a.list)}` : "", tag: "lista" };
     case "item_comprado": return { title: `${nick} marcou ${q(a.title)} como comprado`, body: a.list || "", tag: "lista" };
     case "lista_nova": return { title: `${nick} criou a lista ${q(a.title)}`, body: "", tag: "lista" };
-    case "humor": return { title: `${nick} está ${a.title || ""}`.trim(), body: "Toque para ver como ela(e) está", tag: "humor" };
+    case "humor": return { title: `${nick} está ${a.title || ""}`.trim(), body: "Toque para ver", tag: "humor" };
     case "pergunta": return { title: `${nick} respondeu a pergunta do dia`, body: "Responda para ver a resposta", tag: "pergunta" };
-    default: return null; // edições e exclusões não notificam
+    default: return null;
   }
 }
-
 async function enviar(path: string, a: any) {
   if (!a || !SLOT_USER[a.by] || a.pushed) return 0;
-  const alvo = SLOT_USER[a.by === "a" ? "b" : "a"];
-  const { data: cfg } = await sb.from("docs").select("data").eq("path", "casal/config").maybeSingle();
-  const nick = cfg?.data?.slots?.[a.by]?.nick || (a.by === "a" ? "Déco" : "Juju");
-  const msg = texto(a, nick);
-  if (msg) {
-    const { data: subs } = await sb.from("docs").select("path,data").eq("col", "push").eq("data->>by", alvo);
-    for (const s of subs ?? []) {
-      try { await webpush.sendNotification(s.data.sub, JSON.stringify({ ...msg, url: "./" }), { TTL: 86400 }); }
-      catch (e: any) { if (e?.statusCode === 404 || e?.statusCode === 410) await sb.from("docs").delete().eq("path", s.path); else console.error("push", e?.statusCode, e?.body); }
-    }
-  }
+  const n = await nicks();
+  const msg = texto(a, (n as any)[a.by]);
+  if (msg) await pushPara(outro(a.by), msg);
   await sb.from("docs").update({ data: { ...a, pushed: true } }).eq("path", path);
   return msg ? 1 : 0;
+}
+
+/* ---------- rotinas do dia ---------- */
+async function perguntaDoDia(dia: string) {
+  if (!AI_KEY || !(await umaVez("job-pergunta-" + dia))) return;
+  const n = await nicks();
+  const p = await ia(`Você cria a "pergunta do dia" de um app de namoro à distância entre ${n.a} e ${n.b} (ele em Vila Velha-ES, ela em Curitiba). Escreva UMA pergunta curta (até 15 palavras), carinhosa e específica sobre o casal: o que fizeram um pelo outro, memórias, planos, sentimentos. Inspire-se nos bilhetes recentes abaixo, sem citar trechos. Responda só com a pergunta, em português do Brasil.\n\nBilhetes recentes:\n${await contexto()}`, "");
+  if (p) await setDoc("sistema/pergunta-" + dia, { q: p.replace(/\s+/g, " "), at: Date.now(), by: "ia" });
+}
+async function datasNamoro(h: ReturnType<typeof agoraBR>) {
+  if (!(await umaVez("job-namoro-" + h.data))) return;
+  const n = await nicks();
+  const [ys, ms, ds] = n.inicio.split("-").map(Number);
+  const meses = (h.y - ys) * 12 + (h.m - ms);
+  let msg: Msg | null = null;
+  if (h.d === ds && meses > 0) {
+    const anos = meses % 12 === 0 ? meses / 12 : 0;
+    const titulo = anos ? `Hoje fazemos ${anos} ${anos === 1 ? "ano" : "anos"} de namoro 💍` : `Hoje fazemos ${meses} ${meses === 1 ? "mês" : "meses"} de namoro 💕`;
+    const corpo = await ia(`Escreva UMA frase curta (até 25 palavras), romântica e natural, em português do Brasil, para ${n.a} e ${n.b}, que hoje completam ${anos ? anos + " ano(s)" : meses + " meses"} de namoro à distância. Use como inspiração os bilhetes recentes, sem citar trechos. Só a frase.\n\n${await contexto()}`, frase());
+    msg = { title: titulo, body: corpo, tag: "namoro" };
+  } else {
+    // aniversário de namoro (anual): avisos 13 e 1 dia antes
+    let ya = h.y; if (h.m > ms || (h.m === ms && h.d > ds)) ya++;
+    const alvo = Date.UTC(ya, ms - 1, ds), hoje = Date.UTC(h.y, h.m - 1, h.d), faltam = Math.round((alvo - hoje) / 864e5), anos = ya - ys;
+    if (anos > 0 && (faltam === 13 || faltam === 1)) {
+      const quando = faltam === 1 ? "Amanhã" : `Faltam 13 dias: dia ${ds}/${String(ms).padStart(2, "0")}`;
+      const corpo = await ia(`Escreva UMA frase curta (até 25 palavras), carinhosa e animada, em português do Brasil, para ${n.a} e ${n.b}, que daqui a ${faltam} dia(s) completam ${anos} ano(s) de namoro à distância. Só a frase.\n\n${await contexto()}`, frase());
+      msg = { title: `${quando} fazemos ${anos} ${anos === 1 ? "ano" : "anos"} de namoro 💍`, body: corpo, tag: "namoro" };
+    }
+  }
+  if (!msg) return;
+  for (const s of ["a", "b"]) { const pr = await getDoc("prefs/" + s); if (pr?.datas !== false) await pushPara(s, msg); }
+}
+async function lembrete20(dia: string) {
+  if (!(await umaVez("job-lembrete-" + dia))) return;
+  const n = await nicks();
+  const { data } = await sb.from("docs").select("data").eq("col", "bilhetes").eq("data->>date", dia);
+  for (const s of ["a", "b"]) {
+    const pr = await getDoc("prefs/" + s);
+    if (pr?.lembrete20 === false) continue;
+    if ((data ?? []).some((r: any) => r.data?.slot === s)) continue;
+    await pushPara(s, { title: `Ainda dá tempo de mandar um bilhete pra ${(n as any)[outro(s)]} 💌`, body: "Um rabisco rápido já mantém a sequência de vocês.", tag: "lembrete" });
+  }
 }
 
 Deno.serve(async (req) => {
@@ -51,15 +130,19 @@ Deno.serve(async (req) => {
     const { data } = await sb.from("docs").select("path,data").eq("path", body.path).maybeSingle();
     if (data) n += await enviar(data.path, data.data);
   } else if (body.tick) {
-    // bilhetes agendados que acabaram de "chegar"
     const agora = Date.now();
     const { data } = await sb.from("docs").select("path,data,updated_at").eq("col", "atividades").eq("data->>t", "nota_nova");
     for (const r of data ?? []) {
       const at = Number(r.data?.at) || 0;
       if (r.data?.pushed || at > agora || at < agora - 2 * 3600e3) continue;
-      if (Date.parse(r.updated_at) > at - 60e3) continue; // não era agendado (já foi notificado na hora)
+      if (Date.parse(r.updated_at) > at - 60e3) continue;
       n += await enviar(r.path, r.data);
     }
+    const h = agoraBR();
+    if (h.hm >= "00:05" && h.hm < "00:15") await perguntaDoDia(h.data);
+    if (h.hm >= "09:00" && h.hm < "09:10") await datasNamoro(h);
+    if (h.hm >= "20:00" && h.hm < "20:10") await lembrete20(h.data);
+    if (body.teste === "namoro") await datasNamoro({ ...h, data: "teste-" + agora });
   }
   return new Response(JSON.stringify({ ok: true, enviados: n }), { headers: { "Content-Type": "application/json" } });
 });

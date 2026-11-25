@@ -4,6 +4,7 @@
   'use strict';
   const CFG = window.BILHETE_CFG || {};
   const DOMAIN = 'bilhete.app';
+  const USERS = ['andre', 'maju']; // só essas duas contas existem
   window.BILHETE_WEB = true;
 
   let ready, resolveReady;
@@ -20,6 +21,8 @@
   .bw-card button{font:inherit;font-weight:700;font-size:17px;min-height:52px;border:0;border-radius:16px;background:#7F3B25;color:#fff;cursor:pointer}
   .bw-card button[disabled]{opacity:.6}
   .bw-err{color:#7F3B25;font-size:14px;min-height:20px;margin:0;text-align:center}
+  .bw-pw{position:relative;display:block}.bw-pw input{width:100%;box-sizing:border-box;padding-right:96px}
+  .bw-card .bw-pw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);min-height:40px;padding:0 12px;font-size:14px;background:#EFE7D6;color:#262C45;border-radius:10px}
   .bw-note{font-size:13px;color:#5E6274;text-align:center;margin:0}`;
   function overlay(html) {
     let st = document.getElementById('bw-style');
@@ -33,26 +36,28 @@
     const ov = overlay(`<form class="bw-card" id="bw-f" autocomplete="on">
       <p class="bw-logo">Bilhete</p><p class="bw-sub">Entre para ver os bilhetes de vocês</p>
       <label>Usuário<input id="bw-u" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
-      <label>Senha<input id="bw-p" name="password" type="password" autocomplete="current-password" required></label>
+      <label>Senha<span class="bw-pw"><input id="bw-p" name="password" type="password" autocomplete="current-password" required><button type="button" id="bw-eye" aria-label="Mostrar senha" aria-pressed="false">Mostrar</button></span></label>
       <p class="bw-err" id="bw-e" role="alert">${msg || ''}</p>
       <button type="submit" id="bw-b">Entrar</button>
       <p class="bw-note">Você só precisa entrar uma vez neste aparelho.</p></form>`);
+    const eye = ov.querySelector('#bw-eye'), pw = ov.querySelector('#bw-p');
+    eye.addEventListener('click', () => { const show = pw.type === 'password'; pw.type = show ? 'text' : 'password'; eye.textContent = show ? 'Ocultar' : 'Mostrar'; eye.setAttribute('aria-pressed', String(show)); eye.setAttribute('aria-label', show ? 'Ocultar senha' : 'Mostrar senha'); pw.focus(); });
     ov.querySelector('#bw-f').addEventListener('submit', async e => {
       e.preventDefault();
       const u = ov.querySelector('#bw-u').value.trim().toLowerCase().replace(/@.*$/, ''), p = ov.querySelector('#bw-p').value;
       const b = ov.querySelector('#bw-b'), er = ov.querySelector('#bw-e');
-      if (!/^[a-z0-9._-]{2,30}$/.test(u)) { er.textContent = 'Usuário inválido.'; return; }
+      if (!USERS.includes(u)) { er.textContent = 'Esse usuário não existe. Use ' + USERS.join(' ou ') + '.'; return; }
       b.disabled = true; b.textContent = 'Entrando…'; er.textContent = '';
       const { data, error } = await sb.auth.signInWithPassword({ email: u + '@' + DOMAIN, password: p });
       b.disabled = false; b.textContent = 'Entrar';
       if (error || !data.session) { const m = String((error && (error.message || error.code)) || ''); console.warn('login', error);
-        er.textContent = /confirm/i.test(m) ? 'Essa conta ainda não foi confirmada no Supabase (Auto Confirm).' : /disabled|not enabled|provider/i.test(m) ? 'O login por e-mail está desligado no Supabase.' : /invalid.*credential|invalid login/i.test(m) ? 'Usuário ou senha incorretos.' : /fetch|network/i.test(m) ? 'Sem conexão com o banco. Confira a internet.' : 'Não deu para entrar: ' + m; return; }
+        er.textContent = /confirm/i.test(m) ? 'Essa conta ainda não foi confirmada no Supabase (Auto Confirm).' : /disabled|not enabled|provider/i.test(m) ? 'O login por e-mail está desligado no Supabase.' : /invalid.*credential|invalid login/i.test(m) ? 'Senha incorreta para ' + u + '. Toque em Mostrar para conferir.' : /fetch|network/i.test(m) ? 'Sem conexão com o banco. Confira a internet.' : 'Não deu para entrar: ' + m; return; }
       start(data.session);
     });
     setTimeout(() => { const i = document.getElementById('bw-u'); if (i) i.focus(); }, 50);
   }
   function start(session) {
-    uname = String(session.user.email || '').split('@')[0];
+    uname = String(session.user.email || '').split('@')[0]; window.bilheteUser = uname;
     closeOverlay(); resolveReady(true);
   }
   window.bilheteSair = async () => { try { await sb.auth.signOut(); } catch (e) {} location.reload(); };
