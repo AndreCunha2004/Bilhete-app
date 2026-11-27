@@ -35,11 +35,21 @@ s = s[:i] + r"""function inicioNamoro(){const v=S.config&&S.config.inicio;return
 function tempoNamoro(ini){const [y,m,d]=ini.split('-').map(Number),[ty,tm,td]=today().split('-').map(Number);let mo=(ty-y)*12+(tm-m),dd=td-d;if(dd<0){mo--;dd+=new Date(Date.UTC(ty,tm-1,0)).getUTCDate()}
  if(mo<0)return 'Começa em '+shortDate(ini);const a=Math.floor(mo/12),r=mo%12,p=[];if(a)p.push(a+(a===1?' ano':' anos'));if(r)p.push(r+(r===1?' mês':' meses'));if(dd||!p.length)p.push(dd+(dd===1?' dia':' dias'));return p.join(', ').replace(/, ([^,]*)$/,' e $1')}
 function pushTxt(){return ({granted:'Ativadas neste aparelho',denied:'Bloqueadas nos Ajustes do iPhone',instalar:'Instale na Tela de Início para ativar','sem-suporte':'Este navegador não aceita'})[window.bilhetePushStatus()]||'Desativadas neste aparelho'}
+const TEMAS=['claro','sistema','escuro'];
+function temaSwitch(v){const i=Math.max(0,TEMAS.indexOf(v));return `<div class="tsw" role="radiogroup" aria-label="Tema" style="--i:${i}"><span class="tth" aria-hidden="true"></span>${[['claro','Claro',I.tsun],['sistema','Igual ao iPhone',I.tsys],['escuro','Escuro',I.tmoon]].map(([k,l,ic],j)=>`<button type="button" role="radio" aria-checked="${j===i}" aria-label="${l}" data-tv="${k}">${ic}</button>`).join('')}</div>`}
+function initTemaSwitch(sw,cb){if(!sw)return;const W=()=>sw.querySelector('button').offsetWidth;let i=Number(getComputedStyle(sw).getPropertyValue('--i'))||0,drag=null;
+ const set=(j,fire)=>{j=Math.max(0,Math.min(2,j));sw.style.removeProperty('--x');sw.classList.remove('arr');sw.style.setProperty('--i',j);sw.querySelectorAll('button').forEach((b,k)=>b.setAttribute('aria-checked',String(k===j)));if(fire&&j!==i){i=j;if(navigator.vibrate)try{navigator.vibrate(8)}catch(_){}cb(TEMAS[j])}};
+ sw.addEventListener('pointerdown',e=>{drag={x0:e.clientX,moved:false,base:i*W()};try{sw.setPointerCapture(e.pointerId)}catch(_){}});
+ sw.addEventListener('pointermove',e=>{if(!drag)return;const dx=e.clientX-drag.x0;if(Math.abs(dx)>4)drag.moved=true;if(!drag.moved)return;e.preventDefault();sw.classList.add('arr');sw.style.setProperty('--x',Math.max(0,Math.min(2*W(),drag.base+dx))+'px')});
+ const up=e=>{if(!drag)return;const d=drag;drag=null;if(d.moved){const x=Math.max(0,Math.min(2*W(),d.base+e.clientX-d.x0));set(Math.round(x/W()),true)}else{const b=document.elementFromPoint(e.clientX,e.clientY);const bt=b&&b.closest&&b.closest('.tsw [data-tv]');if(bt)set(TEMAS.indexOf(bt.dataset.tv),true)}};
+ sw.addEventListener('pointerup',up);sw.addEventListener('pointercancel',()=>{drag=null;set(i)});
+ sw.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();set(i+(e.key==='ArrowRight'?1:-1),true);sw.querySelectorAll('button')[i].focus()}});
+ sw.addEventListener('click',e=>e.stopPropagation())}
 function temaAtual(){return (S.prefs&&S.prefs.tema)||window.bilheteTemaLocal()}
 function openMais(){const nx=nextData(),ini=inicioNamoro(),tm=temaAtual();
  openSheet(`<div class="sh-head"><h2>Configurações</h2><button type="button" class="tool" data-close aria-label="Fechar">${I.close}</button></div>
  <button type="button" class="card who prof" data-page="perfil" aria-label="Seu perfil: ${esc(nick(S.me))}"><span class="av ${S.me}" aria-hidden="true">${esc(initial(nick(S.me)))}</span><div><b>${esc(nick(S.me))}</b><small>Entrou como ${esc(window.bilheteUser||'')}</small></div>${I.chev}</button>
- <section class="grp" aria-label="Aparência"><h3>Aparência</h3><div class="seg" role="radiogroup" aria-label="Tema do app">${[['claro','Claro'],['escuro','Escuro'],['sistema','Sistema']].map(([k,l])=>`<button type="button" role="radio" aria-checked="${tm===k}" data-aparencia="${k}">${l}</button>`).join('')}</div><p class="fine" style="text-align:left;margin:6px 2px 0">Vale para ${esc(nick(S.me))} em todos os aparelhos. Sistema segue o modo do iPhone.</p></section>
+ <section class="grp" aria-label="Aparência"><h3>Aparência</h3><div class="rows"><div class="rowb trow"><span class="ic" aria-hidden="true">${I.tsun}</span><div><b>Tema</b><small id="ttx">${({claro:'Claro',escuro:'Escuro',sistema:'Igual ao iPhone'})[tm]}</small></div>${temaSwitch(tm)}</div></div></section>
  ${mgrp('Início',[mrow(I.grip,'Organizar o Início','Ou arraste pelo ícone no canto de cada bloco','data-org')])}
  ${mgrp('Nós dois',[mrow(I.heart(false),'Nosso namoro',esc(tempoNamoro(ini))+' · desde '+esc(shortDate(ini)),'data-page="namoro"'),mrow(I.cal,'Datas especiais',nx?esc((diffDays(nx.date)===0?'Hoje: ':'Próxima: ')+nx.title+' · '+shortDate(nx.date)):'Aniversários, viagens e contagens','data-datas')])}
  ${mgrp('Avisos',[mrow(I.bell,'Notificações',esc(pushTxt()),'data-page="notif"')])}
@@ -48,7 +58,7 @@ function openMais(){const nx=nextData(),ini=inicioNamoro(),tm=temaAtual();
  ()=>{$('#backupbtn').addEventListener('click',exportBackup);$('#sairbtn').addEventListener('click',()=>confirmSheet('Sair da conta neste aparelho?','Sair',()=>window.bilheteSair()));
   $('#importbtn').addEventListener('click',()=>$('#importin').click());$('#importin').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
    try{const txt=await f.text();toast('Importando…');const n=await window.bilheteImportar(txt,(d,t)=>{if(d===t||d%100===0)toast('Importando… '+d+' de '+t)});toast(n+' itens importados. Recarregando…');setTimeout(()=>location.reload(),1500)}catch(err){toast(err&&err.message?err.message:'Não deu para importar.')}})
-  $('#sheet').querySelectorAll('[data-aparencia]').forEach(b=>b.addEventListener('click',async()=>{const v=b.dataset.aparencia;$('#sheet').querySelectorAll('[data-aparencia]').forEach(x=>x.setAttribute('aria-checked',String(x===b)));window.bilheteTema(v);const np={...(S.prefs||{}),tema:v};S.prefs=np;try{await S.db.doc('prefs/'+S.me).set(np)}catch(err){handleErr(err)}}))},null,{label:'Configurações',reopen:openMais})}
+  initTemaSwitch($('#sheet .tsw'),async v=>{const tx=$('#ttx');if(tx)tx.textContent=({claro:'Claro',escuro:'Escuro',sistema:'Igual ao iPhone'})[v];window.bilheteTema(v);const np={...(S.prefs||{}),tema:v};S.prefs=np;try{await S.db.doc('prefs/'+S.me).set(np)}catch(err){handleErr(err)}})},null,{label:'Configurações',reopen:openMais})}
 function openNamoro(){const ini=inicioNamoro();
  openSheet(`<div class="sh-head"><h2>Nosso namoro</h2><button type="button" class="tool" data-close aria-label="Fechar">${I.close}</button></div>
  <section class="card col" style="align-items:center;text-align:center;gap:4px"><span class="hand" style="font-size:34px">${esc(tempoNamoro(ini))}</span><small>juntos desde ${esc(longDate(ini))}</small></section>
@@ -84,6 +94,7 @@ async function openDiag(){openSheet(`<div class="sh-head"><h2>Diagnóstico</h2><
    $('#dgres').innerHTML=h})},null,{label:'Diagnóstico',reopen:openDiag})}
 function openPage(n){if(n==='perfil')openProfile();else if(n==='namoro')openNamoro();else if(n==='notif')openNotif();else if(n==='diag')openDiag()}
 """ + s[j:]
+rep("const I={grip:", "const I={tsun:sv('<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4\"/>'),tmoon:sv('<path d=\"M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z\"/>'),tsys:sv('<rect x=\"3\" y=\"4\" width=\"18\" height=\"12\" rx=\"2\"/><path d=\"M8 20h8M12 16v4\"/>'),menu:sv('<path d=\"M4 7h16M4 12h16M4 17h16\"/>'),gear:sv('<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z\"/>'),grip:")
 rep("async function afterSend(carta,title){", "async function afterSend(carta,title){return;")
 rep("Ligado à sua conta Claude. Fica fixo neste perfil.", "Ligado ao seu login. Fica fixo neste perfil.")
 # pergunta do dia gerada pela IA (quando existir)
@@ -144,7 +155,23 @@ navigator.serviceWorker.register('sw.js').then(reg=>{const chk=()=>reg.update().
 # ---------- barra: engrenagem de Configurações no lugar de "Mais" ----------
 GEAR='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>'
 i = s.index('<button type="button" data-mais>'); j = s.index('</button>', i) + 9
-s = s[:i] + '<button type="button" data-mais aria-label="Configurações">' + GEAR + 'Ajustes</button>' + s[j:]
+MENU='<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>'
+s = s[:i] + '<button type="button" data-menu aria-label="Abrir o menu" aria-controls="lateral" aria-expanded="false">' + MENU + 'Menu</button>' + s[j:]
+# menu lateral de vidro (igual ao Recanto) logo depois da barra
+rep('<div class="sheet" id="sheet" hidden></div>', '<div class="veu" id="veu" hidden></div><aside class="lateral" id="lateral" aria-label="Menu" inert></aside>\n<div class="sheet" id="sheet" hidden></div>')
+rep("let lpT=0,lpXY=null;", r'''function drawerHtml(){const it=(ic,t,attr,cur)=>`<button type="button" class="litem" ${attr}${cur?' aria-current="page"':''}>${ic}<span>${t}</span></button>`,v=S.view;
+ return `<div class="lhead">${logo(30)}<div><b>Bilhete</b><small>${esc(nick('a'))} & ${esc(nick('b'))}</small></div></div>
+ <nav class="lnav" aria-label="Seções">${it(I.home,'Início','data-go="hoje"',v==='hoje')}${it(I.grid,'Mural','data-go="mural"',v==='mural')}${it(I.list,'Listas','data-go="listas"',v==='listas')}
+ <div class="lsep"></div>${it(I.flame,'Sequência','data-mural-cal',v==='sequencia')}${it(I.cal,'Datas especiais','data-datas',v==='datasv')}${it(I.bell,'Notificações','data-page="notif"',v==='notifv')}${it(I.grip,'Organizar o Início','data-org')}</nav>
+ <div class="lfoot"><button type="button" class="litem lme" data-mais><span class="av ${S.me}" aria-hidden="true">${esc(initial(nick(S.me)))}</span><span>${esc(nick(S.me))}<small>Entrou como ${esc(window.bilheteUser||'')}</small></span></button>${it(I.gear,'Configurações','data-mais')}</div>`}
+function drawer(open){const L=$('#lateral'),V=$('#veu'),b=document.querySelector('[data-menu]');if(!L)return;if(open){L.innerHTML=drawerHtml();L.removeAttribute('inert');V.hidden=false;requestAnimationFrame(()=>{L.classList.add('aberta');V.classList.add('on')});document.body.classList.add('menu-aberto')}
+ else{L.classList.remove('aberta');V.classList.remove('on');L.setAttribute('inert','');document.body.classList.remove('menu-aberto');setTimeout(()=>{if(!L.classList.contains('aberta'))V.hidden=true},240)}if(b)b.setAttribute('aria-expanded',String(!!open))}
+document.addEventListener('click',e=>{const m=e.target.closest&&e.target.closest('[data-menu]');if(m){drawer(!$('#lateral').classList.contains('aberta'));return}
+ if(e.target.id==='veu'){drawer(false);return}const li=e.target.closest&&e.target.closest('#lateral .litem');if(li)setTimeout(()=>drawer(false),0)});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('#lateral').classList.contains('aberta')){e.stopImmediatePropagation();drawer(false)}},true);
+{let sx=null;document.addEventListener('pointerdown',e=>{sx=e.target.closest&&e.target.closest('#lateral')?e.clientX:null});document.addEventListener('pointerup',e=>{if(sx!==null&&sx-e.clientX>60)drawer(false);sx=null})}
+let lpT=0,lpXY=null;''')
+rep("</head>", pathlib.Path(__file__).with_name('menu.css').read_text(encoding='utf-8')+"</head>")
 s = s.replace('(dá pra voltar em Mais)', '(dá pra voltar em Configurações)')
 
 # ---------- tema travado por usuário (Claro / Escuro / Sistema) ----------
