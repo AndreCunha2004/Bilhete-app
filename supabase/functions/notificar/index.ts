@@ -63,17 +63,21 @@ const FRASES = ["Cada mês ao seu lado é o meu lugar favorito no calendário.",
 const frase = () => FRASES[Math.floor(Math.random() * FRASES.length)];
 
 /* ---------- textos das atividades ---------- */
+// Padrão de app de mensagem: título = quem (e onde), corpo = o que aconteceu + conteúdo.
+// No iPhone aparece: título em negrito · "from Bilhete" (fixo do iOS para apps web) · corpo.
 function texto(a: any, nick: string): Msg | null {
   const k = a.kind === "carta" ? "carta" : "desenho";
+  const conteudo = (s?: string) => (s ? ": " + s.replace(/\s+/g, " ").slice(0, 120) : "");
+  const onde = (l?: string) => (l ? `${nick} · ${l}` : nick);
   switch (a.t) {
-    case "nota_nova": return { title: `${nick} te mandou ${k === "carta" ? "uma carta" : "um desenho"} 💌`, body: a.title || a.snip || "Abra para ver", tag: "nota" };
-    case "amei": return { title: `${nick} amou seu ${k} ❤️`, body: a.title || "", tag: "amei" };
-    case "chat": return { title: `${nick} comentou${a.title ? " em " + q(a.title) : ""}`, body: a.snip || "", tag: "chat" };
-    case "item_novo": return { title: `${nick} adicionou ${q(a.title)}`, body: a.list ? `na lista ${q(a.list)}` : "", tag: "lista" };
-    case "item_comprado": return { title: `${nick} marcou ${q(a.title)} como comprado`, body: a.list || "", tag: "lista" };
-    case "lista_nova": return { title: `${nick} criou a lista ${q(a.title)}`, body: "", tag: "lista" };
-    case "humor": return { title: `${nick} está ${a.title || ""}`.trim(), body: "Toque para ver", tag: "humor" };
-    case "pergunta": return { title: `${nick} respondeu a pergunta do dia`, body: "Responda para ver a resposta", tag: "pergunta" };
+    case "nota_nova": return { title: nick, body: (k === "carta" ? "💌 Carta" : "🎨 Desenho") + (a.title ? `: ${a.title}` : a.snip ? conteudo(a.snip) : " novo para você"), tag: "nota" };
+    case "amei": return { title: nick, body: `❤️ Amou seu ${k}${a.title ? `: ${a.title}` : ""}`, tag: "amei" };
+    case "chat": return { title: onde(a.list), body: `💬 ${a.title ? a.title + " — " : ""}${(a.snip || "").slice(0, 140)}`, tag: "chat" };
+    case "item_novo": return { title: onde(a.list), body: `➕ Adicionou ${q(a.title)}`, tag: "lista" };
+    case "item_comprado": return { title: onde(a.list), body: `✅ Marcou ${q(a.title)} como comprado`, tag: "lista" };
+    case "lista_nova": return { title: nick, body: `📝 Criou a lista ${q(a.title)}`, tag: "lista" };
+    case "humor": return { title: nick, body: `Está ${a.title || "com um novo humor"}`, tag: "humor" };
+    case "pergunta": return { title: nick, body: "❓ Respondeu a pergunta do dia. Responda para ver", tag: "pergunta" };
     default: return null;
   }
 }
@@ -101,7 +105,7 @@ async function datasNamoro(h: ReturnType<typeof agoraBR>) {
   let msg: Msg | null = null;
   if (h.d === ds && meses > 0) {
     const anos = meses % 12 === 0 ? meses / 12 : 0;
-    const titulo = anos ? `Hoje fazemos ${anos} ${anos === 1 ? "ano" : "anos"} de namoro 💍` : `Hoje fazemos ${meses} ${meses === 1 ? "mês" : "meses"} de namoro 💕`;
+    const titulo = anos ? `💍 ${anos} ${anos === 1 ? "ano" : "anos"} de namoro hoje` : `💕 ${meses} ${meses === 1 ? "mês" : "meses"} de namoro hoje`;
     const corpo = await ia(`Escreva UMA frase curta (até 25 palavras), romântica e natural, em português do Brasil, para ${n.a} e ${n.b}, que hoje completam ${anos ? anos + " ano(s)" : meses + " meses"} de namoro à distância. Use como inspiração os bilhetes recentes, sem citar trechos. Só a frase.\n\n${await contexto()}`, frase());
     msg = { title: titulo, body: corpo, tag: "namoro" };
   } else {
@@ -109,9 +113,8 @@ async function datasNamoro(h: ReturnType<typeof agoraBR>) {
     let ya = h.y; if (h.m > ms || (h.m === ms && h.d > ds)) ya++;
     const alvo = Date.UTC(ya, ms - 1, ds), hoje = Date.UTC(h.y, h.m - 1, h.d), faltam = Math.round((alvo - hoje) / 864e5), anos = ya - ys;
     if (anos > 0 && (faltam === 13 || faltam === 1)) {
-      const quando = faltam === 1 ? "Amanhã" : `Faltam 13 dias: dia ${ds}/${String(ms).padStart(2, "0")}`;
       const corpo = await ia(`Escreva UMA frase curta (até 25 palavras), carinhosa e animada, em português do Brasil, para ${n.a} e ${n.b}, que daqui a ${faltam} dia(s) completam ${anos} ano(s) de namoro à distância. Só a frase.\n\n${await contexto()}`, frase());
-      msg = { title: `${quando} fazemos ${anos} ${anos === 1 ? "ano" : "anos"} de namoro 💍`, body: corpo, tag: "namoro" };
+      msg = { title: faltam === 1 ? `💍 Amanhã: ${anos} ${anos === 1 ? "ano" : "anos"} de namoro` : `💍 Faltam 13 dias para ${anos} ${anos === 1 ? "ano" : "anos"} de namoro`, body: corpo, tag: "namoro" };
     }
   }
   if (!msg) return;
@@ -125,7 +128,7 @@ async function lembrete20(dia: string) {
     const pr = await getDoc("prefs/" + s);
     if (pr?.lembrete20 === false) continue;
     if ((data ?? []).some((r: any) => r.data?.slot === s)) continue;
-    await pushPara(s, { title: `Ainda dá tempo de mandar um bilhete pra ${(n as any)[outro(s)]} 💌`, body: "Um rabisco rápido já mantém a sequência de vocês.", tag: "lembrete" });
+    await pushPara(s, { title: "Lembrete do dia", body: `💌 Ainda dá tempo de mandar um bilhete pra ${(n as any)[outro(s)]}. Um rabisco rápido já mantém a sequência.`, tag: "lembrete" });
   }
 }
 
@@ -144,7 +147,7 @@ Deno.serve(async (req) => {
     if (!slot) return json({ ok: false, erro: "Login não reconhecido." }, 401);
     const segredos = { VAPID_PUBLIC: !!Deno.env.get("VAPID_PUBLIC"), VAPID_PRIVATE: !!Deno.env.get("VAPID_PRIVATE"), NOTIFY_TOKEN: !!Deno.env.get("NOTIFY_TOKEN"), ANTHROPIC_API_KEY: !!AI_KEY };
     const atraso = Math.min(Math.max(Number(body.atraso) || 0, 0), 20);
-    const teste = { title: "Teste do Bilhete 💌", body: "Se você está vendo isto, as notificações funcionam.", tag: "teste-" + Date.now() };
+    const teste = { title: "Teste", body: "💌 Se você está vendo isto, as notificações funcionam.", tag: "teste-" + Date.now() };
     if (atraso) { // envia depois, para testar com o app fechado
       const job = (async () => { await new Promise((ok) => setTimeout(ok, atraso * 1000)); const e = await pushPara(slot, teste); console.log("teste atrasado", nome, JSON.stringify(e)); })();
       // @ts-ignore EdgeRuntime existe no Supabase
