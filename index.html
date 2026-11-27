@@ -4,7 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bilhete</title>
-<meta name="theme-color" content="#F5F0E6">
+<meta name="theme-color" content="#F5F0E6" id="themecolor">
+<script>(function(){var mq=window.matchMedia?matchMedia('(prefers-color-scheme: dark)'):null;
+function cor(){var r=document.documentElement,d=r.dataset.theme==='dark'||(!r.dataset.theme&&mq&&mq.matches),m=document.getElementById('themecolor');if(m)m.setAttribute('content',d?'#17181F':'#F5F0E6')}
+window.bilheteTemaLocal=function(){try{return localStorage.getItem('bilhete-tema')||'sistema'}catch(e){return 'sistema'}};
+window.bilheteTema=function(t){t=t==='claro'||t==='escuro'?t:'sistema';var r=document.documentElement;if(t==='sistema')delete r.dataset.theme;else r.dataset.theme=t==='escuro'?'dark':'light';try{localStorage.setItem('bilhete-tema',t)}catch(e){}cor()};
+window.bilheteTema(window.bilheteTemaLocal());if(mq&&mq.addEventListener)mq.addEventListener('change',cor);document.addEventListener('DOMContentLoaded',cor)})();</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -13,8 +18,8 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
 <script src="vendor/supabase-2.119.2.js"></script>
-<script src="config.js?v=1795611392"></script>
-<script src="supa.js?v=1795611392"></script>
+<script src="config.js?v=1795819198"></script>
+<script src="supa.js?v=1795819198"></script>
 <style>
 @font-face{font-family:'Caveat';font-weight:500;font-display:swap;src:url(fonts/caveat-latin-500-normal.woff2) format('woff2')}
 @font-face{font-family:'Caveat';font-weight:700;font-display:swap;src:url(fonts/caveat-latin-700-normal.woff2) format('woff2')}
@@ -121,7 +126,7 @@ input[type=text]{min-height:48px;border:1px solid var(--line);border-radius:12px
 .lbl{font-size:14px;font-weight:500;color:var(--muted)}
 .ichip[aria-checked=true]{background:var(--mk);border-color:var(--mk);color:#262C45;font-weight:700}
 .emo{font-size:24px;line-height:1}.dprev{padding:10px;border-radius:16px;margin-bottom:6px}.dprev b{flex:1;min-width:0}.btn.sm{min-height:40px;padding:0 12px;font-size:14px;gap:6px}.btn.sm svg{width:18px;height:18px}.dpanel{gap:12px;margin-bottom:10px}.dpanel .tabs{margin:0}.swdef{background:var(--surface);border:2px dashed var(--line)}
-a.btn{text-decoration:none}.hsec{display:contents}[data-hsec] *{-webkit-touch-callout:none}.orglink{align-self:center;display:inline-flex;align-items:center;gap:6px}.orglink svg{width:16px;height:16px}
+a.btn{text-decoration:none}.hsec{display:flex;flex-direction:column;gap:14px;position:relative}.hsec:has(>#cdbox:empty){display:none}[data-hsec] *{-webkit-touch-callout:none}.orglink{align-self:center;display:inline-flex;align-items:center;gap:6px}.orglink svg{width:16px;height:16px}
 .cdmore{display:flex;gap:8px;overflow-x:auto;margin-top:8px;padding-bottom:2px;scrollbar-width:none}.cdchip{flex:none;display:flex;align-items:center;gap:8px;padding:6px 12px 6px 6px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font:inherit;color:var(--ink);cursor:pointer}.cdchip b{display:block;font-size:13px;max-width:130px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cdchip small{display:block;font-size:12px;color:var(--muted)}.cdchip .cdic.sm{width:30px;height:30px;border-radius:9px}.cdchip.more{padding:6px 14px;font-weight:700}
 .humor{gap:10px}.hot{color:var(--ink)!important}.emo2{font-size:18px}.hmrow{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.hm2{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 2px;border-radius:14px;border:2px solid transparent;background:var(--bg);font:inherit;color:var(--ink);cursor:pointer}.hm2 span{font-size:24px;line-height:1}.hm2 small{font-size:10.5px;color:var(--muted);text-align:center;line-height:1.15}.hm2[aria-checked=true]{border-color:var(--ink);background:var(--mk)}
 .pq{gap:8px}.pqq{font-size:24px;margin:0;line-height:1.2}.pqa{display:flex;flex-direction:column;padding:10px 12px;border-radius:14px;background:var(--bg)}.pqa.me{background:var(--mk)}.pqa small{color:var(--muted);font-size:12px}.pqlock{display:flex;align-items:center;gap:8px;margin:0;font-size:14px;color:var(--accent);font-weight:600}.pqlock svg{width:18px;height:18px}
@@ -275,7 +280,12 @@ textarea{width:100%;min-height:240px;border:1px solid var(--line);border-radius:
 .lim{margin:8px 0 0;padding-left:20px;display:flex;flex-direction:column;gap:8px;font-size:15px}
 .lim b{display:inline;font-size:inherit}
 </style>
-<style>.namv{align-items:center;text-align:center;gap:4px}.namt{font-size:38px;line-height:1.1}.namf{display:flex;gap:8px;align-items:flex-end;width:100%;margin-top:10px;text-align:left}.namf .field{flex:1;margin:0}.vsec{font-size:18px;margin:18px 0 8px}.nst{display:flex;align-items:center;gap:12px;justify-content:space-between}.nst small{display:block;color:var(--muted)}.sw2{flex:none;width:56px;height:34px;border-radius:999px;border:0;background:#D9D0BE;position:relative;cursor:pointer;padding:0}.sw2 span{position:absolute;top:3px;left:3px;width:28px;height:28px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s}.sw2[aria-checked=true]{background:#4C7A4C}.sw2[aria-checked=true] span{left:25px}.sw2:disabled{opacity:.5}.dgdet summary{cursor:pointer;font-weight:700}.dgdet[open] summary{margin-bottom:10px}.updbar{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;background:#262C45;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.25)}.updbar b{flex:1;font-size:15px}.updbar button{border:0;border-radius:12px;padding:10px 14px;font:inherit;font-weight:700;background:#DCCD8B;color:#262C45}</style><style>.dgr{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--surface);margin-bottom:6px}.dgr>span{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;background:#4C7A4C}.dgr.no>span{background:#B57056}.dgr small{display:block;color:var(--muted)}#dgres{margin-top:10px}</style></head>
+<style>.namv{align-items:center;text-align:center;gap:4px}.namt{font-size:38px;line-height:1.1}.namf{display:flex;gap:8px;align-items:flex-end;width:100%;margin-top:10px;text-align:left}.namf .field{flex:1;margin:0}.vsec{font-size:18px;margin:18px 0 8px}.nst{display:flex;align-items:center;gap:12px;justify-content:space-between}.nst small{display:block;color:var(--muted)}.sw2{flex:none;width:56px;height:34px;border-radius:999px;border:0;background:#D9D0BE;position:relative;cursor:pointer;padding:0}.sw2 span{position:absolute;top:3px;left:3px;width:28px;height:28px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:left .2s}.sw2[aria-checked=true]{background:#4C7A4C}.sw2[aria-checked=true] span{left:25px}.sw2:disabled{opacity:.5}.dgdet summary{cursor:pointer;font-weight:700}.dgdet[open] summary{margin-bottom:10px}.updbar{position:fixed;left:12px;right:12px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:60;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:16px;background:#262C45;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.25)}.updbar b{flex:1;font-size:15px}.updbar button{border:0;border-radius:12px;padding:10px 14px;font:inherit;font-weight:700;background:#DCCD8B;color:#262C45}</style><style>.dgr{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:var(--surface);margin-bottom:6px}.dgr>span{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;background:#4C7A4C}.dgr.no>span{background:#B57056}.dgr small{display:block;color:var(--muted)}#dgres{margin-top:10px}</style><style>.hgrab{position:absolute;top:-9px;right:-7px;z-index:3;width:30px;height:30px;padding:0;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--muted);display:grid;place-items:center;cursor:grab;touch-action:none;box-shadow:0 1px 4px rgba(0,0,0,.12);opacity:.9}
+.hgrab svg{width:16px;height:16px}.hgrab:active{cursor:grabbing}
+.hsec.hlift{z-index:20;transition:none!important;filter:drop-shadow(0 14px 22px rgba(0,0,0,.22));cursor:grabbing}.hsec.hlift>*:not(.hgrab){transform:scale(1.02)}.hsec.hlift .hgrab{background:var(--brand);color:var(--surface);border-color:var(--brand)}
+.hsec.hshift{transition:transform .2s cubic-bezier(.2,.8,.2,1)}body.hdragging{user-select:none;-webkit-user-select:none;overscroll-behavior:none}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;border-radius:14px;background:var(--chip)}.seg button{border:0;border-radius:10px;min-height:40px;background:none;font:600 14px 'DM Sans',sans-serif;color:var(--muted);cursor:pointer}.seg button[aria-checked=true]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.14)}</style>
+</head>
 <body>
 <div class="app">
 <header class="appbar" id="appbar" hidden><span class="brand"><span id="brandlogo"></span><b>Bilhete</b></span><span class="ab-r"><span id="apres" aria-live="polite"></span><button type="button" class="tool bell" id="bell" aria-label="Notificações"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span class="badge" id="bellbadge" hidden></span></button></span></header>
@@ -286,7 +296,7 @@ textarea{width:100%;min-height:240px;border:1px solid var(--line);border-radius:
 <button type="button" data-go="mural"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Mural</button>
 <button type="button" data-go="desenhar" class="fab"><span class="fabc"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>Novo</button>
 <button type="button" data-go="listas"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>Listas</button>
-<button type="button" data-mais><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>Mais</button>
+<button type="button" data-mais aria-label="Configurações"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Ajustes</button>
 </nav>
 </div>
 <div class="sheet" id="sheet" hidden></div>
@@ -373,7 +383,7 @@ function pushPresence(){if(!S.room||!S.me)return;S.room.presence({slot:S.me,mode
 /* ---------- telas ---------- */
 function renderBanner(){const b=$('#banner');const msg=S.me&&!S.canWrite?'Você está só visualizando. Para enviar bilhetes, peça para ser convidado(a) como Editor(a) no botão Compartilhar.':'';b.textContent=msg;b.hidden=!msg}
 function setNav(show){const n=$('#nav');n.hidden=!show;$('#appbar').hidden=!show;if(show&&!$('#brandlogo').firstChild)$('#brandlogo').innerHTML=logo(34);$('#apres').innerHTML=show?appPres():'';n.querySelectorAll('[data-go]').forEach(b=>b.dataset.go===S.view?b.setAttribute('aria-current','page'):b.removeAttribute('aria-current'))}
-function render(){const v=$('#view');if(S.allNotes)S.notes=visibleNotes(S.allNotes);renderBanner();
+function render(){if(S.hdrag){S.hdragPend=1;return}const v=$('#view');if(S.allNotes)S.notes=visibleNotes(S.allNotes);renderBanner();
  if(S.noDb){setNav(false);v.innerHTML=`<div class="hero">${logo()}<h1>Bilhete</h1><p class="lead">Para os bilhetes sincronizarem, abra este app com sua conta Claude conectada (app do Claude ou claude.ai).</p></div>`;return}
  if(!S.configLoaded){setNav(false);v.innerHTML=`<p class="loading">${S.configSlow?'Ainda conectando… confira sua internet.':'Abrindo seus bilhetes…'}</p>`;return}
  if(!S.me){setNav(false);v.innerHTML=viewEntrar();const f=$('#claimf');if(f)f.addEventListener('submit',e=>{e.preventDefault();claim(f.dataset.slot,$('#nick').value.trim())});return}
@@ -433,7 +443,7 @@ function viewHoje(){const t=today(),o=other(),P=esc(nick(o)),h=hourNow(),st=stre
  <button type="button" class="card tile" data-go="listas">${I.list}<b>Listas</b><small>${ls?esc(ls.title||'Lista'):'Criar a primeira'}</small></button></div>`};
  return `<header class="top"><div><p class="date">${esc(longDate(t))}</p><h1>${greet}, ${esc(nick(S.me))}</h1></div><button type="button" class="pill streak" data-mural-cal aria-label="${st} ${st===1?'dia seguido':'dias seguidos'} trocando bilhetes. Ver sequência e recordes">${I.flame}<b>${st}</b>${st===1?'dia seguido':'dias seguidos'}</button></header>
  <div id="pres" aria-live="polite">${presHtml()}</div>
- ${homeOrder().filter(k=>sec[k]).map(k=>`<div class="hsec" data-hsec="${k}">${sec[k]}</div>`).join('')}
+ ${homeOrder().filter(k=>sec[k]).map(k=>`<div class="hsec" data-hsec="${k}">${sec[k]}<button type="button" class="hgrab" data-hgrab aria-label="Mover ${esc((HSEC.find(h=>h[0]===k)||[k,k])[1])} (arraste)">${I.grip}</button></div>`).join('')}
  <button type="button" class="link orglink" data-org>${I.grid}Organizar o Início</button>`}
 /* ---------- início: humor, pergunta, memória, ordem ---------- */
 const HSEC=[['novos','Bilhetes novos'],['contagem','Contagem regressiva'],['enviar','Mandar um bilhete'],['humor','Humor do dia'],['pergunta','Pergunta do dia'],['listas','Novidades nas listas'],['memoria','Hoje há 1 mês'],['atalhos','Mural e Listas']];
@@ -442,7 +452,7 @@ const HUMORES=[['🥰','Amando'],['🥺','Com saudade'],['😄','Feliz'],['😮�
 const PERGUNTAS=["Qual foi a coisa mais fofa que eu já fiz por você?", "Qual momento nosso você reviveria hoje?", "O que eu fiz essa semana que te fez sentir amada(o)?", "Qual foi o nosso melhor encontro até agora?", "O que você mais admira em mim?", "Qual presente meu você mais guarda no coração?", "Qual foi a primeira coisa que reparou em mim?", "Quando você percebeu que estava apaixonada(o) por mim?", "O que eu posso fazer amanhã pra deixar seu dia melhor?", "Qual mania minha você secretamente adora?", "Qual viagem nossa você nunca vai esquecer?", "O que a gente faz junto que você mais ama?", "Qual foi a vez que eu mais te fiz rir?", "Uma frase minha que ficou na sua cabeça?", "Qual foi o momento em que você mais se sentiu cuidada(o) por mim?", "O que você quer que a gente faça na próxima vez que se ver?", "Qual foi o nosso dia perfeito?", "Que lugar você quer conhecer comigo?", "O que mudou em você desde que a gente começou a namorar?", "Qual música é a nossa cara?", "Qual foi o primeiro “eu te amo” que você lembra?", "O que você mais sente falta quando a gente está longe?", "Qual comidinha nossa você quer repetir?", "O que você faria por mim que talvez eu nem imagine?", "Qual sonho a gente vai realizar juntos primeiro?", "Qual foto nossa você mais gosta e por quê?", "Qual surpresa você ainda quer fazer pra mim?", "O que te deixa mais orgulhosa(o) da gente?", "Como você descreveria nós dois em três palavras?", "O que você quer me agradecer hoje?"];
 function perguntaHoje(){if(S.qia&&S.qia.date===today()&&S.qia.q)return S.qia.q;const i=Math.floor(Date.parse(today()+'T12:00:00Z')/864e5);return PERGUNTAS[((i%PERGUNTAS.length)+PERGUNTAS.length)%PERGUNTAS.length]}
 function ensureHomeSubs(){if(!S.db||!S.me)return;const t=today();
- if(S.prefsFor!==S.me){S.prefsFor=S.me;if(S.prefsUnsub)S.prefsUnsub();S.prefsUnsub=S.db.doc('prefs/'+S.me).onSnapshot(d=>{const p=d.exists?d.data():{};S.prefs=p||{};if(S.view==='hoje'&&$('#sheet').hidden)render()},()=>{})}
+ if(S.prefsFor!==S.me){S.prefsFor=S.me;if(S.prefsUnsub)S.prefsUnsub();S.prefsUnsub=S.db.doc('prefs/'+S.me).onSnapshot(d=>{const p=d.exists?d.data():{};S.prefs=p||{};if(S.prefs.tema)window.bilheteTema(S.prefs.tema);if(S.view==='hoje'&&$('#sheet').hidden)render()},()=>{})}
  if(S.dayFor!==t){S.dayFor=t;S.humor={};S.resp={};[S.humorUnsub,S.respUnsub].forEach(u=>u&&u());
   S.humorUnsub=S.db.collection('humor').where('date','==',t).onSnapshot(sn=>{S.humor={};sn.docs.forEach(d=>{const v=d.data();if(v&&(v.slot==='a'||v.slot==='b')&&typeof v.e==='string')S.humor[v.slot]=v});const b=document.querySelector('[data-hsec=humor]');if(b&&S.view==='hoje')b.innerHTML=humorHtml()},()=>{});
   if(S.qiaUnsub)S.qiaUnsub();S.qiaUnsub=S.db.doc('sistema/pergunta-'+t).onSnapshot(d=>{const v=d.exists?d.data():null;S.qia=v&&typeof v.q==='string'?{date:t,q:v.q.slice(0,200)}:null;const b=document.querySelector('[data-hsec=pergunta]');if(b&&S.view==='hoje'&&!(document.activeElement&&document.activeElement.id==='pqin')&&!(S.resp&&S.resp[S.me]))b.innerHTML=perguntaHtml()},()=>{});
@@ -474,8 +484,38 @@ function openOrg(){let ord=homeOrder();const lab=k=>(HSEC.find(h=>h[0]===k)||[k,
   const up=()=>{if(!drag)return;drag.classList.remove('drag');drag=null;ord=[...ol.children].map(x=>x.dataset.ok);re()};ol.addEventListener('pointerup',up);ol.addEventListener('pointercancel',up);
   $('#oreset').addEventListener('click',()=>{ord=HSEC.map(h=>h[0]);re()});
   $('#osave').addEventListener('click',async()=>{try{await S.db.doc('prefs/'+S.me).set({...(S.prefs||{}),homeOrder:ord,at:Date.now()});S.prefs={...(S.prefs||{}),homeOrder:ord};closeSheet();render();toast('Início organizado.')}catch(err){handleErr(err)}})},null,{label:'Organizar',reopen:openOrg})}
+(function(){let d=null;
+const gap=()=>14,secs=()=>[...document.querySelectorAll('#view .hsec')];
+function down(e){const g=e.target.closest&&e.target.closest('[data-hgrab]');if(!g||e.button>0)return;e.preventDefault();const el=g.closest('.hsec'),all=secs(),i=all.indexOf(el);if(i<0)return;
+ try{g.setPointerCapture(e.pointerId)}catch(_){}
+ const rs=all.map(x=>x.getBoundingClientRect());
+ d={g,el,all,i,to:i,rs,h:rs[i].height+gap(),y0:e.clientY+scrollY,y:e.clientY,raf:0};S.hdrag=1;el.classList.add('hlift');document.body.classList.add('hdragging');
+ all.forEach(x=>{if(x!==el)x.classList.add('hshift')});if(navigator.vibrate)try{navigator.vibrate(10)}catch(_){}
+ loop()}
+function place(){if(!d)return;const dy=d.y+scrollY-d.y0;d.el.style.transform=`translateY(${dy}px)`;
+ const c=d.rs[d.i].top+d.rs[d.i].height/2+dy;let to=d.i;
+ d.rs.forEach((r,k)=>{const m=r.top+r.height/2;if(k<d.i&&c<m&&k<to)to=k;if(k>d.i&&c>m)to=Math.max(to,k)});
+ if(to!==d.to){d.to=to;if(navigator.vibrate)try{navigator.vibrate(5)}catch(_){}}
+ d.all.forEach((x,k)=>{if(x===d.el)return;let t=0;if(d.i<k&&k<=d.to)t=-d.h;else if(d.to<=k&&k<d.i)t=d.h;x.style.transform=t?`translateY(${t}px)`:''})}
+function loop(){if(!d)return;const edge=70,vh=innerHeight;let v=0;if(d.y<edge)v=-Math.ceil((edge-d.y)/6);else if(d.y>vh-edge-80)v=Math.ceil((d.y-(vh-edge-80))/6);if(v)scrollBy(0,v);place();d.raf=requestAnimationFrame(loop)}
+function move(e){if(!d)return;e.preventDefault();d.y=e.clientY}
+async function up(){if(!d)return;const D=d;d=null;cancelAnimationFrame(D.raf);
+ const keys=D.all.map(x=>x.dataset.hsec),mv=keys.splice(D.i,1)[0];keys.splice(D.to,0,mv);
+ const par=D.el.parentNode,ref=D.all[D.to<D.i?D.to:D.to+1]||null,r0=D.el.getBoundingClientRect();
+ D.all.forEach(x=>{x.classList.remove('hshift');x.style.transform=''});
+ if(D.to!==D.i)par.insertBefore(D.el,D.to<D.i?D.all[D.to]:(D.all[D.to].nextSibling));
+ const r1=D.el.getBoundingClientRect();D.el.style.transform=`translateY(${r0.top-r1.top}px)`;D.el.getBoundingClientRect();
+ D.el.classList.remove('hlift');D.el.classList.add('hshift');D.el.style.transform='';setTimeout(()=>D.el.classList.remove('hshift'),220);
+ document.body.classList.remove('hdragging');
+ S.hdrag=0;
+ if(D.to!==D.i&&S.db&&S.me){const full=homeOrder(),vis=new Set(keys);let q=0;const ord=full.map(k=>vis.has(k)?keys[q++]:k);
+  S.prefs={...(S.prefs||{}),homeOrder:ord};try{await S.db.doc('prefs/'+S.me).set({...S.prefs,at:Date.now()})}catch(err){handleErr(err)}}
+ if(S.hdragPend){S.hdragPend=0;setTimeout(render,240)}}
+document.addEventListener('pointerdown',down,true);document.addEventListener('pointermove',move,{passive:false});['pointerup','pointercancel'].forEach(t=>document.addEventListener(t,up));
+document.addEventListener('touchmove',e=>{if(d)e.preventDefault()},{passive:false});
+document.addEventListener('click',e=>{if(e.target.closest&&e.target.closest('[data-hgrab]')){e.preventDefault();e.stopPropagation()}},true)})();
 let lpT=0,lpXY=null;
-document.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-hsec]');if(!h||S.view!=='hoje'||e.target.closest('input,textarea,select'))return;lpXY=[e.clientX,e.clientY];clearTimeout(lpT);lpT=setTimeout(()=>{lpT=0;S.lpFired=Date.now();if(navigator.vibrate)try{navigator.vibrate(12)}catch(_){}openOrg()},600)});
+document.addEventListener('pointerdown',e=>{const h=e.target.closest('[data-hsec]');if(!h||e.target.closest('[data-hgrab]')||S.view!=='hoje'||e.target.closest('input,textarea,select'))return;lpXY=[e.clientX,e.clientY];clearTimeout(lpT);lpT=setTimeout(()=>{lpT=0;S.lpFired=Date.now();if(navigator.vibrate)try{navigator.vibrate(12)}catch(_){}openOrg()},600)});
 document.addEventListener('pointermove',e=>{if(lpT&&lpXY&&Math.abs(e.clientX-lpXY[0])+Math.abs(e.clientY-lpXY[1])>12){clearTimeout(lpT);lpT=0}});
 ['pointerup','pointercancel','scroll'].forEach(ev=>document.addEventListener(ev,()=>{clearTimeout(lpT);lpT=0},true));
 document.addEventListener('click',e=>{if(S.lpFired&&Date.now()-S.lpFired<700&&e.target.closest('[data-hsec]')){e.stopPropagation();e.preventDefault()}},true);
@@ -519,16 +559,20 @@ function inicioNamoro(){const v=S.config&&S.config.inicio;return /^\d{4}-\d{2}-\
 function tempoNamoro(ini){const [y,m,d]=ini.split('-').map(Number),[ty,tm,td]=today().split('-').map(Number);let mo=(ty-y)*12+(tm-m),dd=td-d;if(dd<0){mo--;dd+=new Date(Date.UTC(ty,tm-1,0)).getUTCDate()}
  if(mo<0)return 'Começa em '+shortDate(ini);const a=Math.floor(mo/12),r=mo%12,p=[];if(a)p.push(a+(a===1?' ano':' anos'));if(r)p.push(r+(r===1?' mês':' meses'));if(dd||!p.length)p.push(dd+(dd===1?' dia':' dias'));return p.join(', ').replace(/, ([^,]*)$/,' e $1')}
 function pushTxt(){return ({granted:'Ativadas neste aparelho',denied:'Bloqueadas nos Ajustes do iPhone',instalar:'Instale na Tela de Início para ativar','sem-suporte':'Este navegador não aceita'})[window.bilhetePushStatus()]||'Desativadas neste aparelho'}
-function openMais(){const nx=nextData(),ini=inicioNamoro();
- openSheet(`<div class="sh-head"><h2>Mais</h2><button type="button" class="tool" data-close aria-label="Fechar">${I.close}</button></div>
+function temaAtual(){return (S.prefs&&S.prefs.tema)||window.bilheteTemaLocal()}
+function openMais(){const nx=nextData(),ini=inicioNamoro(),tm=temaAtual();
+ openSheet(`<div class="sh-head"><h2>Configurações</h2><button type="button" class="tool" data-close aria-label="Fechar">${I.close}</button></div>
  <button type="button" class="card who prof" data-page="perfil" aria-label="Seu perfil: ${esc(nick(S.me))}"><span class="av ${S.me}" aria-hidden="true">${esc(initial(nick(S.me)))}</span><div><b>${esc(nick(S.me))}</b><small>Entrou como ${esc(window.bilheteUser||'')}</small></div>${I.chev}</button>
+ <section class="grp" aria-label="Aparência"><h3>Aparência</h3><div class="seg" role="radiogroup" aria-label="Tema do app">${[['claro','Claro'],['escuro','Escuro'],['sistema','Sistema']].map(([k,l])=>`<button type="button" role="radio" aria-checked="${tm===k}" data-aparencia="${k}">${l}</button>`).join('')}</div><p class="fine" style="text-align:left;margin:6px 2px 0">Vale para ${esc(nick(S.me))} em todos os aparelhos. Sistema segue o modo do iPhone.</p></section>
+ ${mgrp('Início',[mrow(I.grip,'Organizar o Início','Ou arraste pelo ícone no canto de cada bloco','data-org')])}
  ${mgrp('Nós dois',[mrow(I.cal,'Datas especiais',esc(tempoNamoro(ini))+' de namoro'+(nx?' · próxima: '+esc(nx.title):''),'data-datas')])}
  ${mgrp('Avisos',[mrow(I.bell,'Notificações',esc(pushTxt()),'data-page="notif"')])}
  ${mgrp('Seus dados',[mrow(I.dl,'Exportar backup','Arquivo .json com tudo de vocês','id="backupbtn"'),mrow(I.dl,'Importar backup','Traz um arquivo exportado antes','id="importbtn"')])}
  ${mgrp('Conta',[mrow(I.back,'Sair desta conta','Só neste aparelho','id="sairbtn"')])}<input type="file" id="importin" accept="application/json,.json" hidden>`,
  ()=>{$('#backupbtn').addEventListener('click',exportBackup);$('#sairbtn').addEventListener('click',()=>confirmSheet('Sair da conta neste aparelho?','Sair',()=>window.bilheteSair()));
   $('#importbtn').addEventListener('click',()=>$('#importin').click());$('#importin').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;
-   try{const txt=await f.text();toast('Importando…');const n=await window.bilheteImportar(txt,(d,t)=>{if(d===t||d%100===0)toast('Importando… '+d+' de '+t)});toast(n+' itens importados. Recarregando…');setTimeout(()=>location.reload(),1500)}catch(err){toast(err&&err.message?err.message:'Não deu para importar.')}})},null,{label:'Mais',reopen:openMais})}
+   try{const txt=await f.text();toast('Importando…');const n=await window.bilheteImportar(txt,(d,t)=>{if(d===t||d%100===0)toast('Importando… '+d+' de '+t)});toast(n+' itens importados. Recarregando…');setTimeout(()=>location.reload(),1500)}catch(err){toast(err&&err.message?err.message:'Não deu para importar.')}})
+  $('#sheet').querySelectorAll('[data-aparencia]').forEach(b=>b.addEventListener('click',async()=>{const v=b.dataset.aparencia;$('#sheet').querySelectorAll('[data-aparencia]').forEach(x=>x.setAttribute('aria-checked',String(x===b)));window.bilheteTema(v);const np={...(S.prefs||{}),tema:v};S.prefs=np;try{await S.db.doc('prefs/'+S.me).set(np)}catch(err){handleErr(err)}}))},null,{label:'Configurações',reopen:openMais})}
 function openNamoro(){const ini=inicioNamoro();
  openSheet(`<div class="sh-head"><h2>Nosso namoro</h2><button type="button" class="tool" data-close aria-label="Fechar">${I.close}</button></div>
  <section class="card col" style="align-items:center;text-align:center;gap:4px"><span class="hand" style="font-size:34px">${esc(tempoNamoro(ini))}</span><small>juntos desde ${esc(longDate(ini))}</small></section>
@@ -999,7 +1043,7 @@ async function afterSend(carta,title){return;const c=mailCfg(),auto=!!(S.mcp&&c.
  <a class="btn primary block" id="wa" href="https://wa.me/?text=${encodeURIComponent(msg)}" target="_blank" rel="noopener">${I.chat||''}Avisar no WhatsApp</a>
  <button type="button" class="btn ghost block" id="shr">${navigator.share?'Outro app (iMessage…)':'Copiar mensagem'}</button>
  ${auto?'<p class="fine" id="mailst" style="text-align:left">Mandando e-mail…</p>':''}
- <label class="ck"><input type="checkbox" id="semav">Não perguntar mais (dá pra voltar em Mais)</label><button type="button" class="link" data-close>Agora não</button>`,
+ <label class="ck"><input type="checkbox" id="semav">Não perguntar mais (dá pra voltar em Configurações)</label><button type="button" class="link" data-close>Agora não</button>`,
  ()=>{$('#shr').addEventListener('click',async()=>{try{if(navigator.share)await navigator.share({text:msg});else{await navigator.clipboard.writeText(msg);toast('Mensagem copiada.')}}catch(e){if(e&&e.name!=='AbortError'){try{await navigator.clipboard.writeText(msg);toast('Mensagem copiada.')}catch(_){toast('Não deu para compartilhar.')}}}});
   $('#semav').addEventListener('change',e=>lsSet('bilhete.semAviso',e.target.checked?'1':null));
   if(mailP)mailP.then(r=>{const el=$('#mailst');if(el)el.textContent=r.ok?'E-mail enviado para '+nick(other())+'.':r.msg;else toast(r.ok?'E-mail enviado.':r.msg)})})}
