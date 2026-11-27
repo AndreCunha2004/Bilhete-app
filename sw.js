@@ -1,6 +1,6 @@
 /* Service worker do Bilhete: deixa instalar como app e guarda a casca para abrir rápido.
    Os dados sempre vêm do Supabase (nunca do cache). As notificações entram aqui na próxima etapa. */
-const V = 'bilhete-v10';
+const V = 'bilhete-v11';
 const SHELL = ['./', 'index.html', 'vendor/supabase-2.119.2.js', 'supa.js', 'config.js', 'manifest.webmanifest', 'icons/icon-192.png',
   'fonts/caveat-latin-500-normal.woff2', 'fonts/caveat-latin-700-normal.woff2', 'fonts/dm-sans-latin-400-normal.woff2', 'fonts/dm-sans-latin-500-normal.woff2', 'fonts/dm-sans-latin-700-normal.woff2'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
@@ -16,7 +16,7 @@ self.addEventListener('fetch', e => {
 self.addEventListener('push', e => {
   let d = {}; try { d = e.data ? e.data.json() : {}; } catch (_) { d = { title: 'Bilhete', body: e.data && e.data.text() }; }
   e.waitUntil((async () => {
-    await self.registration.showNotification(d.title || 'Bilhete', { body: d.body || '', tag: d.tag || 'bilhete', renotify: true, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { url: d.url || './' } });
+    await self.registration.showNotification(d.title || 'Bilhete', { body: d.body || '', tag: (d.tag || 'bilhete') + '-' + Date.now(), icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { url: d.url || './' } });
     try { if (self.navigator && self.navigator.setAppBadge) await self.navigator.setAppBadge(); } catch (_) {}
   })());
 });

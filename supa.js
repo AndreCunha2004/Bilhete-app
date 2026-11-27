@@ -330,7 +330,15 @@
   // mantém a inscrição atualizada e limpa o selo do ícone ao abrir
   ready.then(async () => {
     try { if (navigator.clearAppBadge) navigator.clearAppBadge(); } catch (_) {}
-    try { if (window.bilhetePushStatus() === 'granted' && CFG.vapid) { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) await salvarSub(sub); } } catch (e) { console.warn('push', e); }
+    try {
+      if (window.bilhetePushStatus() === 'granted' && CFG.vapid) {
+        const reg = await navigator.serviceWorker.ready; let sub = await reg.pushManager.getSubscription();
+        // inscrição feita com outra chave (ou por um app antigo): refaz para o aviso voltar a chegar
+        const k = sub && sub.options && sub.options.applicationServerKey ? new Uint8Array(sub.options.applicationServerKey) : null, want = b64(CFG.vapid);
+        if (sub && k && (k.length !== want.length || k.some((v, i) => v !== want[i]))) { const old = uname + '_' + await hashOf(sub.toJSON().endpoint); await sub.unsubscribe(); await sb.from('docs').delete().eq('path', 'push/' + old); sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: want }); }
+        if (sub) await salvarSub(sub);
+      }
+    } catch (e) { console.warn('push', e); }
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {}); });
 

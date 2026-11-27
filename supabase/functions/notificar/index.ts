@@ -31,7 +31,7 @@ async function pushPara(slot: string, msg: Msg) {
   console.log("push para", SLOT_USER[slot], "inscrições:", subs?.length ?? 0, "|", msg.title);
   for (const s of subs ?? []) {
     const ap = String(s.data?.ua || "").replace(/^.*\((iPhone|iPad|Macintosh|Android|Windows)[^)]*\).*$/, "$1") || s.path;
-    try { await webpush.sendNotification(s.data.sub, JSON.stringify({ ...msg, url: "./" }), { TTL: 86400 }); res.push({ aparelho: ap, ok: true }); }
+    try { const r: any = await webpush.sendNotification(s.data.sub, JSON.stringify({ ...msg, url: "./" }), { TTL: 86400, urgency: "high" }); console.log("push ok", SLOT_USER[slot], r?.statusCode); res.push({ aparelho: ap, ok: true, status: r?.statusCode }); }
     catch (e: any) {
       res.push({ aparelho: ap, ok: false, status: e?.statusCode, erro: String(e?.body || e?.message || e).slice(0, 160) });
       if (e?.statusCode === 404 || e?.statusCode === 410) await sb.from("docs").delete().eq("path", s.path); else console.error("push falhou", e?.statusCode, e?.body || e?.message);
@@ -143,7 +143,16 @@ Deno.serve(async (req) => {
     const slot = Object.keys(SLOT_USER).find((k) => SLOT_USER[k] === nome);
     if (!slot) return json({ ok: false, erro: "Login não reconhecido." }, 401);
     const segredos = { VAPID_PUBLIC: !!Deno.env.get("VAPID_PUBLIC"), VAPID_PRIVATE: !!Deno.env.get("VAPID_PRIVATE"), NOTIFY_TOKEN: !!Deno.env.get("NOTIFY_TOKEN"), ANTHROPIC_API_KEY: !!AI_KEY };
-    const envios = await pushPara(slot, { title: "Teste do Bilhete 💌", body: "Se você está vendo isto, as notificações funcionam.", tag: "teste" });
+    const atraso = Math.min(Math.max(Number(body.atraso) || 0, 0), 20);
+    const teste = { title: "Teste do Bilhete 💌", body: "Se você está vendo isto, as notificações funcionam.", tag: "teste-" + Date.now() };
+    if (atraso) { // envia depois, para testar com o app fechado
+      const job = (async () => { await new Promise((ok) => setTimeout(ok, atraso * 1000)); const e = await pushPara(slot, teste); console.log("teste atrasado", nome, JSON.stringify(e)); })();
+      // @ts-ignore EdgeRuntime existe no Supabase
+      if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(job); else await job;
+      const { data: subs } = await sb.from("docs").select("path").eq("col", "push").eq("data->>by", nome);
+      return json({ ok: (subs?.length ?? 0) > 0, segredos, agendado: atraso, envios: [], inscricoes: subs?.length ?? 0 });
+    }
+    const envios = await pushPara(slot, teste);
     console.log("teste", nome, JSON.stringify(envios));
     return json({ ok: envios.some((e) => e.ok), segredos, envios });
   }
